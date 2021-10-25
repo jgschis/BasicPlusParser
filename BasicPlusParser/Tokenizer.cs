@@ -18,6 +18,8 @@ namespace BasicPlusParser
         static Regex _numRegEx = new Regex(@"^[0-9]+(\.[0-9]*)?",RegexOptions.IgnoreCase);
         static Regex _idRegEx = new Regex(@"^[a-zA-Z_@][a-zA-Z_$0-9@\.]*", RegexOptions.IgnoreCase);
         static Regex _whiteSpaceRegEx = new Regex(@"\s", RegexOptions.IgnoreCase);
+        static Regex _hexNumRegEx = new Regex(@"^0x[0-9a-f]+", RegexOptions.IgnoreCase);
+        static Regex _slashHexNumRegEx = new Regex(@"^\\[0-9a-f]+\\", RegexOptions.IgnoreCase);
 
 
         public Tokenizer(string text)
@@ -319,6 +321,8 @@ namespace BasicPlusParser
             if (TryMatchCommonName(text, out CommonNameToken commonNameToken)) yield return commonNameToken;
 
             if (TryMatch(_numRegEx, text, out match)) yield return new NumberToken { Text = match.Value };
+            if (TryMatch(_hexNumRegEx, text, out match)) yield return new NumberToken { Text = match.Value };
+            if (TryMatch(_slashHexNumRegEx, text, out match)) yield return new NumberToken { Text = match.Value };
 
             if (TryMatch(_idRegEx, text, out match)) yield return new IdentifierToken { Text = match.Value };
 
