@@ -33,7 +33,7 @@ namespace BasicPlusParser
         public OiProgram Parse()
         {
             OiProgram program = ParseProgramDeclaration();
-            program.Statements = ParseStmts(()=> NextTokenIs(typeof(EofToken)));
+            program.Statements = ParseStmts(() => IsAtEnd());
             program.Labels = _labels;
             program.Errors = _parseErrors;
             return program;
@@ -155,42 +155,39 @@ namespace BasicPlusParser
 
         (List<Statement> thenBlock, List<Statement> elseBlock) ParseThenElseBlock(bool optional = false)
         {
-            List<Statement> elseBlock = new List<Statement>();
-            List<Statement> thenBlock = new List<Statement>();
+            List<Statement> elseBlock = new();
+            List<Statement> thenBlock = new();
             bool hasThen = false;
             bool hasElse = false;
 
             if (NextTokenIs(typeof(ThenToken)))
             {
-                Func<bool> stop;
+                hasThen = true;
                 if (NextTokenIs(typeof(NewLineToken)))
                 {
-                    stop = () => NextTokenIs(typeof(EndToken));
+                    thenBlock = ParseStmts(_ =>PeekNextToken() is EndToken || IsAtEnd());
+                    ConsumeToken(typeof(EndToken));
                 }
                 else
                 {
-                    stop = () => PeekNextToken() is ElseToken || PeekNextToken() is NewLineToken
-                        || PeekNextToken() is EofToken || (PeekNextToken() is SemiColonToken && PeekNextToken(1) is NewLineToken);
+                    thenBlock = ParseStmts(_ => PeekNextToken() is ElseToken || PeekNextToken() is NewLineToken
+                        || IsAtEnd() || (PeekNextToken() is SemiColonToken && PeekNextToken(1) is NewLineToken));
                 }
-
-                thenBlock = ParseStmts(stop);
-                hasThen = true;
             }
 
             if (NextTokenIs(typeof(ElseToken)))
             {
-                Func<bool> stop;
-                if (NextTokenIs(typeof(NewLineToken)))
+                hasElse = true;
+                if (NextTokenIs(typeof(NewLineToken)) || IsAtEnd())
                 {
-                    stop = () => NextTokenIs(typeof(EndToken));
+                    elseBlock = ParseStmts(() => PeekNextToken() is EndToken || IsAtEnd());
+                    ConsumeToken(typeof(EndToken));
                 }
                 else
                 {
-                    stop = () => PeekNextToken() is NewLineToken || PeekNextToken() is EofToken || 
-                    (PeekNextToken() is SemiColonToken && PeekNextToken(1) is NewLineToken);
+                    elseBlock = ParseStmts(() => PeekNextToken() is NewLineToken || IsAtEnd() ||
+                        (PeekNextToken() is SemiColonToken && PeekNextToken(1) is NewLineToken));
                 }
-                elseBlock = ParseStmts(stop);
-                hasElse = true;
             }
 
             if (!(hasElse || hasThen) && optional == false)
@@ -577,7 +574,8 @@ namespace BasicPlusParser
         {
             List<Statement> statements = new();
             ConsumeToken(typeof(NewLineToken), optional: true);
-            statements = ParseStmts(() => NextTokenIs(typeof(RepeatToken)), inLoop: true);
+            statements = ParseStmts(() => PeekNextToken() is RepeatToken || IsAtEnd(), inLoop: true);
+            ConsumeToken(typeof(RepeatToken));
             return new LoopRepeatStatement
             {
                 Statements = statements
@@ -613,7 +611,8 @@ namespace BasicPlusParser
             }
 
             ConsumeToken(typeof(NewLineToken),optional:true);
-            statements = ParseStmts(() => NextTokenIs(typeof(NextToken)), inLoop: true);
+            statements = ParseStmts(() => PeekNextToken() is NextToken || IsAtEnd() , inLoop: true);
+            ConsumeToken(typeof(NextToken));
 
             if (!(PeekNextToken() is NewLineToken || PeekNextToken() is EofToken))
             {
@@ -856,7 +855,7 @@ namespace BasicPlusParser
         public List<Statement> ParseStmts( Func<List<Statement>, bool> stop, bool inLoop = false)
         {
             List<Statement> statements = new();
-            while (_nextTokenIndex < _tokens.Count && !stop(statements))
+            while (!stop(statements))
             {
                 try
                 {
@@ -1491,7 +1490,7 @@ namespace BasicPlusParser
             {
                 return new EmptyStatement();
             }
-            throw new InvalidOperationException($"Not a valid statement {token}");
+            throw Error(GetLineNo(), $"Unmatched token {token}.");
         }
 
         Statement ParseOsDeleteStmt()
@@ -2028,6 +2027,11 @@ namespace BasicPlusParser
             throw new InvalidOperationException("Statement not terminated properly");
         }
 
+        bool IsAtEnd()
+        {
+            return PeekNextToken() is EofToken;
+        }
+
         bool IsProgramEnd()
         {
             while (NextTokenIs(typeof(NewLineToken), typeof(SemiColonToken))) ;
@@ -2041,7 +2045,7 @@ namespace BasicPlusParser
 
         int GetLineNo()
         {
-            return PeekNextToken().LineNo;
+            return PeekNextToken()?.LineNo ?? _tokens.Last().LineNo;
         }
     }
 }
