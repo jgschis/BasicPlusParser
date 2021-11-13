@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using BasicPlusParser.Statements.Expressions;
 
 namespace BasicPlusParser
 {
     public class OsBreadStatement : Statement
     {
-        public string FileVar;
-        public string Variable;
+        public IdExpression FileVariable;
+        public IdExpression Variable;
         public Expression Byte;
         public Expression Length;
     }

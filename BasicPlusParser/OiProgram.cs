@@ -11,6 +11,9 @@ namespace BasicPlusParser
         public List<Statement> Statements = new List<Statement>();
         public Dictionary<string,Local> Locals = new Dictionary<string,Local>();
         public Dictionary<string, Local> Parms = new Dictionary<string, Local>();
+        public Dictionary<string, (List<Statement>, int pos)> Labels = new();
+        public ParseErrors Errors;
+
 
         public OiProgram(ProgramType pType, string name, List<Token> args)
         {

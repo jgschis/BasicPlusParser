@@ -3,16 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using BasicPlusParser.Statements.Expressions;
 
 namespace BasicPlusParser.Statements
 {
-    public class MatReadStatement : Statement
+    public class MatReadStatement : ThenElseStatement
     {
-        public string Var;
+        public IdExpression Var;
         public Expression Handle;
         public Expression Cursor;
         public Expression Key;
-        public List<Statement> Then;
-        public List<Statement> Else;
     }
 }

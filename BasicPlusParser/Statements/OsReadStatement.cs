@@ -3,14 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using BasicPlusParser.Statements.Expressions;
 
 namespace BasicPlusParser.Statements
 {
-    public class OsReadStatement : Statement
+    public class OsReadStatement : ThenElseStatement
     {
-        public string Variable;
+        public IdExpression Variable;
         public Expression FilePath;
-        public List<Statement> ThenBlock;
-        public List<Statement> ElseBlock;
     }
 }

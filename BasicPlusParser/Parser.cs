@@ -9,16 +9,24 @@ namespace BasicPlusParser
 {
     public class Parser
     {
-        public const int MAX_PARAMS = 25;
+        public const int MAX_PARAMS = 500;
 
         int _nextTokenIndex = 0;
         List<Token> _tokens = new();
         Token _nextToken => _nextTokenIndex < _tokens.Count ? _tokens[_nextTokenIndex] : null;
-         
+        Token _prevToken => _nextTokenIndex > 0 ? _tokens[_nextTokenIndex - 1] : null;
+        Dictionary<string, (List<Statement>, int pos)> _labels = new();
+        HashSet<string> _matricies = new();
+        ParseErrors _parseErrors = new();
 
+        bool IsMatrix(Token token)
+        {
+            return _matricies.Contains(token.Text.ToLower());
+        }
+         
         public Parser(string text)
         {
-            Tokenizer tokenizer = new(text);
+            Tokenizer tokenizer = new(text, _parseErrors);
             _tokens = tokenizer.Tokenise();
         }
 
@@ -26,44 +34,39 @@ namespace BasicPlusParser
         {
             OiProgram program = ParseProgramDeclaration();
             program.Statements = ParseStmts(()=> NextTokenIs(typeof(EofToken)));
+            program.Labels = _labels;
+            program.Errors = _parseErrors;
             return program;
         }
 
         OiProgram ParseProgramDeclaration()
         {
             ProgramType programType;
-            NextTokenIs(typeof(CompileToken));
-            if (NextTokenIs(typeof(FunctionToken)))
+            ConsumeToken(typeof(CompileToken), optional: true);
+            Token progType = ConsumeToken("Program type missing. Must be either function or subroutine.", false, typeof(SubroutineToken), typeof(FunctionToken));
+            if (progType is FunctionToken)
             {
                 programType = ProgramType.Function;
             }
-            else if (NextTokenIs(typeof(SubroutineToken)))
+            else
             {
                 programType = ProgramType.Subroutine;
             }
-            else
-            {
-                throw new InvalidOperationException("Program must start with function or subroutine.");
-            }
 
-            if (!NextTokenIs(out Token progName, typeof(IdentifierToken)))
-            {
-                throw new InvalidOperationException("Program must have a name.");
-            }
 
-            ExpectToken(typeof(LParenToken));
-            List<Token> args = new List<Token>();
+            Token progName = ConsumeIdToken("Program must have a name.");
+            ConsumeToken(typeof(LParenToken));
+            List<Token> args = new();
             while (!NextTokenIs(typeof(RParenToken)))
             {
-                Token arg = GetNextToken();
-                if (arg is not IdentifierToken)
+                if (args.Count > 0)
                 {
-                    throw new InvalidOperationException("Invalid parameter");
+                    ConsumeToken(typeof(CommaToken));
                 }
+                Token arg = ConsumeIdToken();
                 args.Add(arg);
-                NextTokenIs(typeof(CommaToken));
             }
-            ExpectToken(typeof(NewLineToken));
+            ConsumeToken(typeof(NewLineToken));
             return new OiProgram(programType, progName.Text, args);
         }
 
@@ -84,7 +87,7 @@ namespace BasicPlusParser
             {
                 handle = ParseExpr();
             }
-            ExpectToken(typeof(CommaToken));
+            ConsumeToken(typeof(CommaToken));
             Expression key = ParseExpr();
 
             (List<Statement> thenBlock, List<Statement> elseBlock) = ParseThenElseBlock(optional:true);
@@ -110,7 +113,7 @@ namespace BasicPlusParser
             {
                 handle = ParseExpr();
             }
-            ExpectToken(typeof(CommaToken));
+            ConsumeToken(typeof(CommaToken));
             Expression key = ParseExpr();
 
             (List<Statement> thenBlock, List<Statement> elseBlock) = ParseThenElseBlock();
@@ -136,7 +139,7 @@ namespace BasicPlusParser
             {
                 handle = ParseExpr();
             }
-            ExpectToken(typeof(CommaToken));
+            ConsumeToken(typeof(CommaToken));
             Expression key = ParseExpr();
 
             (List<Statement> thenBlock, List<Statement> elseBlock) = ParseThenElseBlock(optional:true);
@@ -167,7 +170,7 @@ namespace BasicPlusParser
                 else
                 {
                     stop = () => PeekNextToken() is ElseToken || PeekNextToken() is NewLineToken
-                        || PeekNextToken() is EofToken;
+                        || PeekNextToken() is EofToken || (PeekNextToken() is SemiColonToken && PeekNextToken(1) is NewLineToken);
                 }
 
                 thenBlock = ParseStmts(stop);
@@ -176,7 +179,6 @@ namespace BasicPlusParser
 
             if (NextTokenIs(typeof(ElseToken)))
             {
-
                 Func<bool> stop;
                 if (NextTokenIs(typeof(NewLineToken)))
                 {
@@ -184,7 +186,8 @@ namespace BasicPlusParser
                 }
                 else
                 {
-                    stop = () => PeekNextToken() is NewLineToken || PeekNextToken() is EofToken;
+                    stop = () => PeekNextToken() is NewLineToken || PeekNextToken() is EofToken || 
+                    (PeekNextToken() is SemiColonToken && PeekNextToken(1) is NewLineToken);
                 }
                 elseBlock = ParseStmts(stop);
                 hasElse = true;
@@ -192,22 +195,25 @@ namespace BasicPlusParser
 
             if (!(hasElse || hasThen) && optional == false)
             {
-                throw new InvalidOperationException("If statement requires either a then or else block.");
+                throw Error(GetLineNo(), "Then or else block expected.");
             }
 
             return (thenBlock, elseBlock);
+        }
+
+        ParseException Error (int lineNo, string message)
+        {
+            _parseErrors.ReportError(lineNo, message);
+            return new ParseException();
         }
 
 
         Statement ParseMatWriteStmt()
         {
             Expression expr = ParseExpr();
-            if (!NextTokenIs(typeof(OnToken), typeof(ToToken)))
-            {
-                throw new InvalidOperationException("Expected on or to");
-            }
+            ConsumeToken("Expected on or to", false, typeof(OnToken), typeof(ToToken));
             Expression handle = ParseExpr();
-            ExpectToken(typeof(CommaToken));
+            ConsumeToken(typeof(CommaToken));
             Expression key = ParseExpr();
 
             (List<Statement> thenBlock, List<Statement> elseBlock) = ParseThenElseBlock();
@@ -225,11 +231,9 @@ namespace BasicPlusParser
         Statement ParseWriteStmt()
         {
             Expression expr = ParseExpr();
-            if (!NextTokenIs(typeof(OnToken), typeof(ToToken))){
-                throw new InvalidOperationException("Expected on or to");
-            }
+            ConsumeToken("Expected on or to", false, typeof(OnToken), typeof(ToToken));
             Expression handle = ParseExpr();
-            ExpectToken(typeof(CommaToken));
+            ConsumeToken(typeof(CommaToken));
             Expression key = ParseExpr();
 
             (List<Statement> thenBlock, List<Statement> elseBlock) = ParseThenElseBlock();
@@ -245,11 +249,8 @@ namespace BasicPlusParser
 
         Statement ParseMatReadStmt()
         {
-            if (!NextTokenIs(out Token var, typeof(IdentifierToken)))
-            {
-                throw new InvalidOperationException("Identifier expected.");
-            }
-            ExpectToken(typeof(FromToken));
+            Token var = ConsumeIdToken();
+            ConsumeToken(typeof(FromToken));
             Expression handle = null;
             Expression cursor = null;
             if (NextTokenIs(typeof(CursorToken)))
@@ -260,7 +261,7 @@ namespace BasicPlusParser
             {
                 handle = ParseExpr();
             }
-            ExpectToken(typeof(CommaToken));
+            ConsumeToken(typeof(CommaToken));
             Expression key = ParseExpr();
 
             (List<Statement> thenBlock, List<Statement> elseBlock) = ParseThenElseBlock();
@@ -272,7 +273,7 @@ namespace BasicPlusParser
                 Handle = handle,
                 Key = key,
                 Then = thenBlock,
-                Var = var.Text
+                Var = new IdExpression(var.Text)
             };
         }
 
@@ -280,10 +281,8 @@ namespace BasicPlusParser
 
         Statement ParseReadStmt()
         {
-            if (!NextTokenIs(out Token var, typeof(IdentifierToken))){
-                throw new InvalidOperationException("Identifier expected.");
-            }
-            ExpectToken(typeof(FromToken));
+            Token var = ConsumeIdToken();
+            ConsumeToken(typeof(FromToken));
             Expression handle = null;
             Expression cursor = null;
             if (NextTokenIs(typeof(CursorToken))){
@@ -293,7 +292,7 @@ namespace BasicPlusParser
             {
                 handle = ParseExpr();
             }
-            ExpectToken(typeof(CommaToken));
+            ConsumeToken(typeof(CommaToken));
             Expression key = ParseExpr();
 
             (List<Statement> thenBlock, List<Statement> elseBlock) = ParseThenElseBlock();
@@ -305,39 +304,38 @@ namespace BasicPlusParser
                 Handle = handle,
                 Key = key,
                 Then = thenBlock,
-                Var = var.Text
+                Variable = new IdExpression(var.Text,IdentifierType.Assignment)
             };
         }
 
         AssignmentStatement ParseAssignmentStmt(Token token)
         {
             Expression expr = ParseExpr();
-            return new AssignmentStatement { Expr = expr, Name = token.Text };
+            return new AssignmentStatement { Value = expr, Variable = new IdExpression(token.Text,IdentifierType.Assignment) };
         }
 
 
         Statement ParseDeclareStmt()
         {
-            List<string> functions = new List<String>();
+            List<IdExpression> functions = new List<IdExpression>();
             ProgramType pType;
-            if (NextTokenIs(typeof(SubroutineToken)))
+            Token funcType = ConsumeToken("Expected subroutine or function.", false, typeof(SubroutineToken), typeof(FunctionToken));
+            if (funcType is SubroutineToken)
             {
                 pType = ProgramType.Subroutine;
             } 
-            else if (NextTokenIs(typeof(FunctionToken)))
+            else 
             {
-                pType = ProgramType.Subroutine;
-            }
-            else
-            {
-                throw new InvalidOperationException("Expected subroutine or function.");
+                pType = ProgramType.Function;
             }
 
-            while (NextTokenIs(out Token token, typeof(IdentifierToken)))
+            do
             {
-                functions.Add(token.Text);
-                NextTokenIs(typeof(CommaToken));
-            }   
+                Token func = ConsumeIdToken();
+                functions.Add(new IdExpression(func.Text, IdentifierType.Function));
+            } while (NextTokenIs(typeof(CommaToken)));
+
+           
             return new DeclareStatement
             {
                 PType = pType,
@@ -349,18 +347,15 @@ namespace BasicPlusParser
         Statement ParseOpenStmt()
         {
             Expression table = ParseExpr();
-            ExpectToken(typeof(ToToken));
-            if (!NextTokenIs(out Token handle,typeof(IdentifierToken)))
-            {
-                throw new InvalidOperationException("Identifier expected.");
-            }
+            ConsumeToken(typeof(ToToken));
+            Token handle = ConsumeIdToken();
 
-           (List<Statement> thenBlock, List<Statement> elseBlock) = ParseThenElseBlock();
+            (List<Statement> thenBlock, List<Statement> elseBlock) = ParseThenElseBlock();
 
             return new OpenStatement
             {
                 Else = elseBlock,
-                Handle = handle.Text,
+                Handle = new IdExpression(handle.Text),
                 Table = table,
                 Then = thenBlock
             };
@@ -379,13 +374,10 @@ namespace BasicPlusParser
 
         Statement ParseGoToStmt()
         {
-            if (!NextTokenIs(out Token label, typeof(IdentifierToken))){
-                throw new InvalidOperationException("Expected identifier.");
-            }
-
+            Token label = ConsumeIdToken();
             return new GoToStatement
             {
-                Label = label.Text
+                Label = new IdExpression(label.Text, IdentifierType.Label)
             };
         }
 
@@ -395,7 +387,7 @@ namespace BasicPlusParser
             Expression seq = null;
 
             Expression needle = ParseExpr();
-            ExpectToken(typeof(InToken));
+            ConsumeToken(typeof(InToken));
             Expression haystack = ParseExpr();
             if (NextTokenIs(typeof(ByToken)))
             {
@@ -407,12 +399,8 @@ namespace BasicPlusParser
             {
                 delim = ParseExpr();
             }
-            ExpectToken(typeof(SettingToken));
-            if (!NextTokenIs(out Token pos, typeof(IdentifierToken)))
-            {
-                throw new InvalidOperationException("Expected identifeir.");
-            }
-
+            ConsumeToken(typeof(SettingToken));
+            Token pos = ConsumeIdToken();
             (List<Statement> thenBlock, List<Statement> elseBlock) = ParseThenElseBlock();
             
             if (isBy)
@@ -423,7 +411,7 @@ namespace BasicPlusParser
                     Haystack = haystack,
                     Delim = delim,
                     Else = elseBlock,
-                    Pos = pos.Text,
+                    Pos = new IdExpression(pos.Text),
                     Seq = seq,
                     Then = thenBlock
                 };
@@ -435,7 +423,7 @@ namespace BasicPlusParser
                     Else = elseBlock,
                     Haystack = haystack,
                     Needle = needle,
-                    Start = pos.Text,
+                    Start = new IdExpression(pos.Text),
                     Then = thenBlock
                 };
             } 
@@ -447,24 +435,19 @@ namespace BasicPlusParser
 
             Expression index = ParseExpr();
 
-            if (NextTokenIs(typeof(GosubToken))){
-                isGosub = true;
-            } else if (!NextTokenIs(typeof(GoToToken)))
+            Token jmpToken = ConsumeToken("Expected goto or gosub.", false, typeof(GosubToken), typeof(GoToToken));
+            if (jmpToken is GosubToken)
             {
-                throw new InvalidOperationException("Expected gosub or goto.");
+                isGosub = true;
             }
 
-            List<String> labels = new List<string>();
+            List<IdExpression> labels = new();
 
             do
             {
-                if (NextTokenIs(out Token label, typeof(IdentifierToken))){
-                    labels.Add(label.Text);
-                }
-                else
-                {
-                    throw new InvalidOperationException("expected identifier.");
-                }
+                Token label = ConsumeIdToken();
+                labels.Add(new IdExpression(label.Text));
+   
             } while (NextTokenIs(typeof(CommaToken)));
 
             if (isGosub)
@@ -493,15 +476,15 @@ namespace BasicPlusParser
             return new IfStatement
             {
                 Condition = cond,
-                ThenBlock = thenBlock,
-                ElseBlock = elseBlock
+                Then = thenBlock,
+                Else = elseBlock
             };
         }
 
         public Case ParseCase()
         {
             Expression cond = ParseExpr();
-            ExpectStatementEnd();
+            ConsumeToken(typeof(NewLineToken));
             List<Statement> statements = 
                 ParseStmts(() => PeekNextToken() is  CaseToken || PeekNextToken() is EndToken);
             return new Case
@@ -513,15 +496,15 @@ namespace BasicPlusParser
 
         public Statement ParseCaseStmt()
         {
-            ExpectToken(typeof(CaseToken));
-            ExpectToken(typeof(NewLineToken));
-            List<Case> cases = new List<Case>();
+            ConsumeToken(typeof(CaseToken));
+            ConsumeToken(typeof(NewLineToken));
+            List<Case> cases = new();
             while (NextTokenIs(typeof(CaseToken)))
             {
                 cases.Add(ParseCase());
             }
-            ExpectToken(typeof(EndToken));
-            ExpectToken(typeof(CaseToken));
+            ConsumeToken(typeof(EndToken));
+            ConsumeToken(typeof(CaseToken));
             return new CaseStmt
             {
                 Cases = cases
@@ -530,27 +513,27 @@ namespace BasicPlusParser
 
         public Statement ParseAngleAssignmentStmt(Token token)
         {
-            List<Expression> indexes = new List<Expression>();
+            List<Expression> indexes = new();
             do
             {
                 indexes.Add(ParseExpr(takeGt: true));
             }
             while (indexes.Count < 4 && NextTokenIs(typeof(CommaToken)));
-            ExpectToken(typeof(RAngleBracketToken));
-            ExpectToken(typeof(EqualToken));
+            ConsumeToken(typeof(RAngleBracketToken));
+            ConsumeToken(typeof(EqualToken));
             Expression expr = ParseExpr();
             return new AngleArrayAssignmentStatement
             {
                 Indexes = indexes,
-                Name = token.Text,
-                Expr = expr
+                Variable = new IdExpression(token.Text, IdentifierType.Reference),
+                Value = expr
             };
         }
 
         Statement ParseWhileStmt()
         {
             Expression cond = ParseExpr();
-            NextTokenIs(typeof(DoToken));
+            ConsumeToken(typeof(DoToken),optional:true);
             return new WhileStatement
             {
                 Condition = cond
@@ -560,7 +543,7 @@ namespace BasicPlusParser
         Statement ParseUntilStmt()
         {
             Expression cond = ParseExpr();
-            NextTokenIs(typeof(DoToken));
+            ConsumeToken(typeof(DoToken),optional:true);
             return new UntilStatement
             {
                 Condition = cond
@@ -569,13 +552,13 @@ namespace BasicPlusParser
 
         Statement ParseEquStatement(Token token)
         {
-            Expression id = ParseExpr();
-            ExpectToken(typeof(ToToken));
+            Token var = ConsumeIdToken();
+            ConsumeToken(typeof(ToToken));
             Expression val = ParseExpr();
             return new EquStatemnet
             {
-                Id = id,
-                Val = val
+                Variable = new IdExpression(var.Text),
+                Value = val
             };
         }
 
@@ -583,17 +566,17 @@ namespace BasicPlusParser
         Statement ParseFunctionCallStmt(Token token)
         {
             _nextTokenIndex -= 2;
-            Expression funEx = ParseExpr();
+            FuncExpression funcExpr = (FuncExpression) ParseExpr();
             return new FunctionCallStatement
             {
-                Expr = funEx
+                Expr = funcExpr
             };
         }
 
         Statement ParseLoopRepeatStmt()
         {
-            List<Statement> statements = new List<Statement>();
-            NextTokenIs(typeof(NewLineToken));
+            List<Statement> statements = new();
+            ConsumeToken(typeof(NewLineToken), optional: true);
             statements = ParseStmts(() => NextTokenIs(typeof(RepeatToken)), inLoop: true);
             return new LoopRepeatStatement
             {
@@ -601,56 +584,44 @@ namespace BasicPlusParser
             };
         }
 
-        public Statement ParseMatAssignmentStmt()
+        public Statement ParseMatStmt()
         {
-            if (!NextTokenIs(out Token matrix, typeof(IdentifierToken)))
-            {
-                throw new InvalidOperationException("Expected identifier.");
-            }
-
-            ExpectToken(typeof(EqualToken));
-            Expression expr = null;
+            Token matrix = ConsumeIdToken();
+            ConsumeToken(typeof(EqualToken));
             Token otherMatrix = null;
-            expr = ParseExpr();
-           // if (expectTerminator) ExpectStatementEnd();
-            return new MatAssignmentStatement
+            Expression expr = ParseExpr();
+            return new MatStatement
             {
-                Name = matrix as IdentifierToken,
+                Variable = new IdExpression(matrix.Text),
                 Expr = expr,
-                OtherMatrix = otherMatrix as IdentifierToken
+                OtherMatrix = new IdExpression(otherMatrix?.Text, IdentifierType.Reference)
             };
         }
 
         public Statement ParseForLoopStmt()
         {
-            List<Statement> statements = new List<Statement>();
-            Token startId = GetNextToken();
-            if (startId is not IdentifierToken)
-            {
-                throw new InvalidOperationException("Identifier expected.");
-            }
-            ExpectToken(typeof(EqualToken));
-
-            AssignmentStatement index = ParseAssignmentStmt(startId);
-            ExpectToken(typeof(ToToken));
+            List<Statement> statements = new();
+            Token startVar = ConsumeIdToken();
+            ConsumeToken(typeof(EqualToken));
+            AssignmentStatement index = ParseAssignmentStmt(startVar);
+            ConsumeToken(typeof(ToToken));
             Expression end = ParseExpr();
             Expression step = null;
-
 
             if (NextTokenIs(typeof(StepToken))) {
                 step = ParseExpr();
             }
 
-            if (!NextTokenIs(typeof(NextToken))){
-                ExpectStatementEnd();
-                statements = ParseStmts(() => NextTokenIs(typeof(NextToken)), inLoop: true);
+            ConsumeToken(typeof(NewLineToken),optional:true);
+            statements = ParseStmts(() => NextTokenIs(typeof(NextToken)), inLoop: true);
 
-                if (!(PeekNextToken() is NewLineToken || PeekNextToken() is EofToken))
-                {
-                    // Ignore whatever junk is after the next statement...
-                    ParseExpr();
-                }
+            if (!(PeekNextToken() is NewLineToken || PeekNextToken() is EofToken))
+            {
+                // Basic + allows you to put an expression after the next keyword. But it has
+                // no significance, so we just eat it.
+                ParseExpr();
             }
+            
             return new ForNextStatement
             {
                 Start = index,
@@ -665,16 +636,11 @@ namespace BasicPlusParser
             Token value = null;
             Expression cursor = null;
 
-            if (!NextTokenIs(out Token variable, typeof(IdentifierToken))) {
-                throw new InvalidOperationException("Expected identifier.");
-            }
+            Token variable = ConsumeIdToken();
 
             if (NextTokenIs(typeof(CommaToken)))
             {
-                if (!NextTokenIs(out value, typeof(IdentifierToken)))
-                {
-                    throw new InvalidOperationException("Expected identifier.");
-                }
+                value = ConsumeIdToken();
             }
 
             if (NextTokenIs( typeof(UsingToken)))
@@ -687,8 +653,8 @@ namespace BasicPlusParser
             return new ReadNextStatement
             {
                 Cursor = cursor,
-                Value = value?.Text,
-                Variable = variable.Text,
+                Value = new IdExpression(value?.Text),
+                Variable = new IdExpression( variable.Text),
                 Else = elseBlock,
                 Then = thenBlock
             };
@@ -697,47 +663,39 @@ namespace BasicPlusParser
 
         Statement ParseRemoveStmt()
         {
-            if (!NextTokenIs(out Token var, typeof(IdentifierToken))){
-                throw new InvalidOperationException("Expected identifier.");
-            }
-            ExpectToken(typeof(FromToken));
+            Token var = ConsumeIdToken();
+            ConsumeToken(typeof(FromToken));
             Expression from = ParseExpr();
-            ExpectToken(typeof(AtToken));
-            if (!NextTokenIs(out Token pos, typeof(IdentifierToken)))
-            {
-                throw new InvalidOperationException("Expected identifier.");
-            }
-            ExpectToken(typeof(SettingToken));
-            if (!NextTokenIs(out Token flag, typeof(IdentifierToken)))
-            {
-                throw new InvalidOperationException("Expected identifier.");
-            }
+            ConsumeToken(typeof(AtToken));
+            Token pos = ConsumeIdToken();
+            ConsumeToken(typeof(SettingToken));
+            Token flag = ConsumeIdToken();
             return new RemoveStatement
             {
-                Var = var.Text,
+                Variable = new IdExpression(var.Text),
                 From = from,
-                Pos = pos.Text,
-                Flag = flag.Text
+                Pos = new IdExpression(pos.Text),
+                Flag = new IdExpression(flag.Text)
             };
 
         }
 
         public Statement ParseSquareBracketArrayAssignmentStmt(Token token)
         {
-            List<Expression> indexes = new List<Expression>();
+            List<Expression> indexes = new();
             do
             {
                 indexes.Add(ParseExpr());
             }
             while (indexes.Count < 2 && NextTokenIs(typeof(CommaToken)));
-            ExpectToken(typeof(RSqrBracketToken));
-            ExpectToken(typeof(EqualToken));
+            ConsumeToken(typeof(RSqrBracketToken));
+            ConsumeToken(typeof(EqualToken));
             Expression expr = ParseExpr();
             return new SquareBracketArrayAssignmentStatement
             {
                 Indexes = indexes,
-                Name = token.Text,
-                Expr = expr
+                Variable = new IdExpression(token.Text, IdentifierType.Reference),
+                Value = expr
             };
         }
 
@@ -746,79 +704,64 @@ namespace BasicPlusParser
             Expression expr = ParseExpr(optional: true);
             return new ReturnStatement
             {
-                Expr = expr
+                Argument = expr
             };
         }
 
 
         public Statement ParseSwapStmt()
         {
-            Expression old_val = ParseExpr();
-            ExpectToken(typeof(WithToken));
-            Expression new_val = ParseExpr();
-            ExpectToken(typeof(InToken));
-            if (!NextTokenIs(out Token token, typeof(IdentifierToken))){
-                throw new InvalidOperationException("Expected idenftier");
-            }
+            Expression oldVal = ParseExpr();
+            ConsumeToken(typeof(WithToken));
+            Expression newVal = ParseExpr();
+            ConsumeToken(typeof(InToken));
+            Token variable = ConsumeIdToken();
             return new SwapStatement
             {
-                Name = token.Text,
-                New = new_val,
-                Old = old_val
+                Variable = new IdExpression(variable.Text),
+                New = newVal,
+                Old = oldVal
             };
         }
 
-        public Statement ParseInternalSubStmt(Token token)
+        Statement ParseInternalSubStmt(Token token)
         {
-            ExpectStatementEnd();
-            List<Statement> statements = ParseStmts(x => x.Count > 0 &&  x.Last() is ReturnStatement 
-                || PeekNextToken() is EofToken);   
+            //ExpectStatementEnd();
+            //List<Statement> statements = ParseStmts(x => x.Count > 0 &&  x.Last() is ReturnStatement 
+           //     || PeekNextToken() is EofToken);   
             return new InternalSubStatement
             {
-                Name = token.Text,
-                Statements = statements
+                Label = new IdExpression(token.Text,IdentifierType.Label),
+               // Statements = statements
             };
         }
 
         Statement ParseGosubStmt()
         {
-            Token token = GetNextToken();
-            if (token is IdentifierToken)
+            Token label = ConsumeIdToken();
+            return new GosubStatement
             {
-                return new GosubStatement
-                {
-                    Name = token.Text
-                };
-            } else
-            {
-                throw new InvalidOperationException("Identifer expected.");
-            }
+                Label = new IdExpression(label.Text, IdentifierType.Label)
+            };
         }
 
         Statement ParsePlusAssignmentStmt(Token token)
         {
-
             Expression expr = ParseExpr();
             return new PlusAssignmentStatement
             {
-                Expr = expr,
-                Name = token.Text
+                Value = expr,
+                Variable = new IdExpression(token.Text, IdentifierType.Reference)
             };
         }
 
         Statement ParseInsertStmt()
         {
-            if (NextTokenIs( out Token token, typeof(IdentifierToken)))
+            Token insert = ConsumeIdToken();
+            return new InsertStatement
             {
-                return new InsertStatement
-                {
-                    Name = token.Text
-                };
-            }
-            else
-            {
-                throw new InvalidOperationException("Identifed expiected.");
-            }
+                Name = new IdExpression(insert.Text, IdentifierType.Insert)
+            };
         }
 
         Statement ParseMinusAssignmentStmt(Token token)
@@ -826,59 +769,53 @@ namespace BasicPlusParser
             Expression expr = ParseExpr();
             return new MinusAssignmentStatement
             {
-                Expr = expr,
-                Name = token.Text
+                Value = expr,
+                Variable = new IdExpression(token.Text,IdentifierType.Reference)
             };
         }
 
         Statement ParseDivideAssignmentStmt(Token token)
         {
-
             Expression expr = ParseExpr();
             return new DivideAssignmentStatement
             {
-                Expr = expr,
-                Name = token.Text
+                Value = expr,
+                Variable = new IdExpression(token.Text, IdentifierType.Reference)
             };
         }
         Statement ParseMulAssignmentStmt(Token token)
         {
-
             Expression expr = ParseExpr();
             return new MulAssignmentStatement
             {
-                Expr = expr,
-                Name = token.Text
+                Value = expr,
+                Name = new IdExpression(token.Text,IdentifierType.Reference)
             };
         }
-
-       
 
         Statement ParseConvertStmt()
         {
             Expression from = ParseExpr();
-            ExpectToken(typeof(ToToken));
+            ConsumeToken(typeof(ToToken));
             Expression to = ParseExpr();
-            ExpectToken(typeof(InToken));
-            Expression in_part = ParseExpr();
+            ConsumeToken(typeof(InToken));
+            Expression inPart = ParseExpr();
            
             return new ConvertStatement
             {
                 From = from,
                 To = to,
-                In = in_part
+                In = inPart
             };
         }
-
-
 
         Statement ParseConcatAssignmentStmt(Token token)
         {
             Expression expr = ParseExpr();
             return new ConcatAssignmentStatement
             {
-                Expr = expr,
-                Name = token.Text
+                Value = expr,
+                Variable = new IdExpression(token.Text, IdentifierType.Reference)
             };
         }
 
@@ -896,109 +833,100 @@ namespace BasicPlusParser
             Expression funcExpr = ParseExpr();
             return new CallStatement
             {
-                expr = funcExpr
+                Expr = funcExpr
             };
         }
 
+        void AnnotateStmt(List<Statement> statements, int lineNo)
+        {
+            Statement statement = statements.Last();
+            statement.LineNo = lineNo;
+            switch (statement) {
+                case 
+                    InternalSubStatement s: _labels.Add(s.Label.Name, (statements, statements.Count));
+                    break;
+            } 
+        }
 
         public List<Statement> ParseStmts(Func<bool> stop, bool inLoop = false)
         {
-            Func<List<Statement>, bool> sto = (_) => stop();
-            return ParseStmts(sto, inLoop: inLoop);
+            return ParseStmts(_ => stop(), inLoop: inLoop);
         }
 
         public List<Statement> ParseStmts( Func<List<Statement>, bool> stop, bool inLoop = false)
         {
-            List<Statement> statements = new List<Statement>();
-            while (_nextTokenIndex < _tokens.Count)
+            List<Statement> statements = new();
+            while (_nextTokenIndex < _tokens.Count && !stop(statements))
             {
-                if (stop(statements))
+                try
                 {
-                    break;
-                }
+                    if (statements.Count >= 1) ExpectStatementSeparator();
 
-    
-                if (statements.Count() >= 1)
+                    if (stop(statements))
+                    {
+                        break;
+                    }
+
+                    int lineNo = GetLineNo();
+                    statements.Add(ParseStmt(inLoop: inLoop));
+                    AnnotateStmt(statements, lineNo);
+
+                } catch 
                 {
-                    ExpectStatementEnd();
-                }
-
-
-                if (stop(statements))
-                {
-                    break;
-                }
-
-                int lineNo = GetLineNo();
-                statements.Add(ParseStmt(inLoop: inLoop));
-                statements.Last().LineNo = lineNo;
+                    while (!stop(statements) && PeekNextToken() is not NewLineToken && PeekNextToken() is not SemiColonToken)
+                    {
+                        _nextTokenIndex += 1;
+                    }
+                }   
             }
             return statements;
         }
 
-        int GetLineNo()
-        {
-            return PeekNextToken().LineNo;
-        }
-
         Statement ParseTransferStmt()
         {
-            if (!NextTokenIs(out Token from, typeof(IdentifierToken)))
-            {
-                throw new InvalidOperationException("Identifier Expected");
-            }
-            ExpectToken(typeof(ToToken));
-            if (!NextTokenIs(out Token to, typeof(IdentifierToken)))
-            {
-                throw new InvalidOperationException("Identifier Expected");
-
-            }
-
+            Token from = ConsumeIdToken();
+            ConsumeToken(typeof(ToToken));
+            Token to = ConsumeIdToken();
             return new TransferStatement
             {
-                From = from.Text,
-                To = to.Text
+                From = new IdExpression(from.Text, IdentifierType.Reference),
+                To = new IdExpression(to.Text, IdentifierType.Reference)
             };
         }
 
 
         Statement ParseOsReadStmt()
         {
-            if (!NextTokenIs(out Token var, typeof(IdentifierToken))){
-                throw new InvalidOperationException("Identifier expiected.");
-            }
-            ExpectToken(typeof(FromToken));
+            Token variable = ConsumeIdToken();
+            ConsumeToken(typeof(FromToken));
             Expression filePath = ParseExpr();
             (List<Statement> thenBlock, List<Statement> elseBlock) = ParseThenElseBlock();
 
             return new OsReadStatement
             {
-                Variable = var.Text,
-                ElseBlock = elseBlock,
+                Variable = new IdExpression(variable.Text),
+                Else = elseBlock,
                 FilePath = filePath,
-                ThenBlock = thenBlock
+                Then = thenBlock
             };
         }
 
         Statement ParseDimStmt(Token token)
         {
             List<Matrix> matricies = new();
-
             do
             {
-                if (!NextTokenIs(out Token matVar, typeof(IdentifierToken)))
-                {
-                    throw new InvalidOperationException("Expected identifier");
-                }
-                ExpectToken(typeof(LParenToken));
+                Token matVar = ConsumeIdToken();
+                ConsumeToken(typeof(LParenToken));
                 Expression row = ParseExpr();
                 Expression col = null;
                 if (NextTokenIs(typeof(CommaToken)))
                 {
                     col = ParseExpr();
                 }
-                ExpectToken(typeof(RParenToken));
-                matricies.Add(new Matrix { Col = col, Row = row, Name = matVar.Text });
+                ConsumeToken(typeof(RParenToken));
+                matricies.Add(new Matrix ( matVar.Text,col,row));
+                _matricies.Add(matVar.Text.ToLower());
 
             } while (NextTokenIs(typeof(CommaToken)));
 
@@ -1011,21 +939,16 @@ namespace BasicPlusParser
         Statement ParsePragmaStmt()
         {
             PragmaOption opt;
-            if (NextTokenIs(typeof(OutputToken))){
+            Token pragmaType = ConsumeToken(null, false, typeof(OutputToken), typeof(PreCompToken));
+            if (pragmaType is OutputToken){
                 opt = PragmaOption.Output;
-            } else if (NextTokenIs(typeof(PreCompToken)))
-            {
-                opt = PragmaOption.PreComp;
             }
             else
             {
-                throw new InvalidOperationException("Expected PRECOMP or OUTPUT");
+                opt = PragmaOption.PreComp;
             }
 
-            if (!NextTokenIs(out Token option, typeof(IdentifierToken))){
-                throw new InvalidOperationException("Expected identifier.");
-            }
-
+            Token option = ConsumeIdToken();
             return new PragmaStatement
             {
                 Keyword = opt,
@@ -1036,9 +959,7 @@ namespace BasicPlusParser
         Statement ParseOsWriteStmt()
         {
             Expression expr = ParseExpr();
-            if (!NextTokenIs(typeof(ToToken), typeof(OnToken))){
-                throw new InvalidOperationException("To or On keyword expected");
-            }
+            ConsumeToken(null,false,typeof(ToToken), typeof(OnToken));
             Expression location = ParseExpr();
             return new OsWriteStatement
             {
@@ -1049,24 +970,18 @@ namespace BasicPlusParser
 
         Statement ParseCommonStmt()
         {
-            if (!NextTokenIs(out Token CommonNameToken, typeof(CommonNameToken))){
-                throw new InvalidOperationException("Expected common block name.");
-            }
-
-            List<string> globalVars = new();
-
+            Token commonBlockId = ConsumeIdToken();
+            List<IdExpression> globalVars = new();
             do
             {
-                if (!NextTokenIs(out Token name, typeof(IdentifierToken))){
-                    throw new InvalidOperationException("identifier expected.");
-                }
-                globalVars.Add(name.Text);
+                Token name = ConsumeIdToken();
+                globalVars.Add(new IdExpression(name.Text));
 
             } while (NextTokenIs(typeof(CommaToken)));
 
             return new CommonStatement
             {
-                CommonName = CommonNameToken.Text,
+                CommonName = new IdExpression(commonBlockId.Text),
                 GlovalVars = globalVars
             };
         }
@@ -1074,11 +989,11 @@ namespace BasicPlusParser
 
         Statement ParseInitRndStmt()
         {
-            Expression expr = ParseExpr();
+            Expression seed = ParseExpr();
 
             return new InitRndStatement
             {
-                Expr = expr
+                Seed = seed
             };
         }
 
@@ -1102,14 +1017,10 @@ namespace BasicPlusParser
             return new GarbageCollectStatement();
         }
 
-
         Statement ParseReadOStmt()
         {
-            if (!NextTokenIs(out Token variable, typeof(IdentifierToken)))
-            {
-                throw new InvalidOperationException("Identified Expected");
-            }
-            ExpectToken(typeof(FromToken));
+            Token variable = ConsumeIdToken();
+            ConsumeToken(typeof(FromToken));
             Expression cursor = null;
             Expression tableVar = null;
             if (NextTokenIs(typeof(CursorToken)))
@@ -1119,7 +1030,7 @@ namespace BasicPlusParser
             {
                 tableVar = ParseExpr();
             }
-            ExpectToken(typeof(CommaToken));
+            ConsumeToken(typeof(CommaToken));
             Expression key = ParseExpr();
          
             (List<Statement> thenBlock, List<Statement> elseBlock) = ParseThenElseBlock();
@@ -1127,7 +1038,7 @@ namespace BasicPlusParser
             {
                 Key = key,
                 TableVar = tableVar,
-                Variable = variable.Text,
+                Variable = new IdExpression(variable.Text),
                 Else = elseBlock,
                 Then = thenBlock,
                 Cursor = cursor
@@ -1138,14 +1049,12 @@ namespace BasicPlusParser
 
         Statement ParseReadVStmt()
         {
-            if (!NextTokenIs(out Token variable, typeof(IdentifierToken))){
-                throw new InvalidOperationException("Identified Expected");
-            }
-            ExpectToken(typeof(FromToken));
+            Token variable = ConsumeIdToken();
+            ConsumeToken(typeof(FromToken));
             Expression tableVar = ParseExpr();
-            ExpectToken(typeof(CommaToken));
+            ConsumeToken(typeof(CommaToken));
             Expression key = ParseExpr();
-            ExpectToken(typeof(CommaToken));
+            ConsumeToken(typeof(CommaToken));
             Expression col = ParseExpr();
 
             (List<Statement> thenBlock,List<Statement> elseBlock)  = ParseThenElseBlock();
@@ -1154,7 +1063,7 @@ namespace BasicPlusParser
                 Column  = col,
                 Key = key,
                 TableVar = tableVar,
-                Variable = variable.Text,
+                Variable = new IdExpression(variable.Text),
                 Else = elseBlock,
                 Then = thenBlock
             };
@@ -1162,27 +1071,20 @@ namespace BasicPlusParser
 
         Statement ParseMatParseStmt()
         {
-
-            if (!NextTokenIs(out Token variable, typeof(IdentifierToken))){
-                throw new InvalidOperationException("Identifier expecited");
-            }
-            ExpectToken(typeof(IntoToken));
-            if (!NextTokenIs(out Token matrixVar, typeof(IdentifierToken)))
-            {
-                throw new InvalidOperationException("Identifier expecited");
-            }
+            Token variable = ConsumeIdToken();
+            ConsumeToken(typeof(IntoToken));
+            Token matrixVar = ConsumeIdToken();
             Expression delim = null;
             if (NextTokenIs(typeof(UsingToken)))
             {
                 delim = ParseExpr();
             }
 
-
             return new MatParseStatement
             {
                 Delim = delim,
-                Matrix = matrixVar.Text,
-                Variable = variable.Text
+                Matrix = new IdExpression(matrixVar.Text),
+                Variable = new IdExpression(variable.Text)
             };
         }
 
@@ -1198,14 +1100,11 @@ namespace BasicPlusParser
         Statement ParseWriteVStmt()
         {
             Expression expr = ParseExpr();
-            if (!NextTokenIs(typeof(OnToken), typeof(ToToken)))
-            {
-                throw new InvalidOperationException("Expected on or to");
-            }
+            ConsumeToken(null,false,typeof(OnToken), typeof(ToToken));
             Expression handle = ParseExpr();
-            ExpectToken(typeof(CommaToken));
+            ConsumeToken(typeof(CommaToken));
             Expression key = ParseExpr();
-            ExpectToken(typeof(CommaToken));
+            ConsumeToken(typeof(CommaToken));
             Expression col = ParseExpr();
 
 
@@ -1223,27 +1122,20 @@ namespace BasicPlusParser
 
         Statement ParseFreeCommonStmt()
         {
-            if(!NextTokenIs(out Token label, typeof(IdentifierToken))){
-                throw new InvalidOperationException("Expected identifier");
-            }
-
-
+            Token label = ConsumeIdToken();
             return new FreeCommonStatement
             {
-                Label = label.Text
+                Variable = new IdExpression(label.Text,identifierType: IdentifierType.Reference)
             };
         }
 
         Statement ParseOsCloseStmt()
         {
-            if(!NextTokenIs(out Token variable, typeof(IdentifierToken)))
-            {
-                throw new InvalidOperationException("Expected identifier.");
-            }
+            Token variable = ConsumeIdToken();
 
             return new OsCloseStatement
             {
-                FileVar = variable.Text
+                FileVar = new IdExpression(variable.Text, IdentifierType.Reference)
             };
         }
 
@@ -1261,72 +1153,73 @@ namespace BasicPlusParser
         Statement ParseOsBWriteStmt()
         {
             Expression expr = ParseExpr();
-            ExpectToken(typeof(OnToken),typeof(ToToken));
-            if(!NextTokenIs(out Token fileVar, typeof(IdentifierToken)))
-            {
-                throw new InvalidOperationException("expected identifier");
-            }
-            ExpectToken(typeof(AtToken));
-            Expression byt = ParseExpr();
+            ConsumeToken(null,false,typeof(OnToken),typeof(ToToken));
+            Token fileVar = ConsumeIdToken();
+            ConsumeToken(typeof(AtToken));
+            Expression @byte = ParseExpr();
             return new OsBWriteStatement
             {
-                Byte = byt,
+                Byte = @byte,
                 Expr = expr,
-                FileVar = fileVar.Text
+                Variable = new IdExpression(fileVar.Text, IdentifierType.Reference)
             };
         }
 
         Statement ParseOsBReadStmt()
         {
-            if (!NextTokenIs(out Token variable, typeof(IdentifierToken)))
-            {
-                throw new InvalidOperationException("expected identifier");
-            }
-            ExpectToken(typeof(FromToken));
-            if (!NextTokenIs(out Token fileVar, typeof(IdentifierToken)))
-            {
-                throw new InvalidOperationException("expected identifier");
-            }
-            ExpectToken(typeof(AtToken));
+            Token variable = ConsumeIdToken();
+            ConsumeToken(typeof(FromToken));
+            Token fileVar = ConsumeIdToken();
+            ConsumeToken(typeof(AtToken));
             Expression byt = ParseExpr();
-            ExpectToken(typeof(LengthToken));
+            ConsumeToken(typeof(LengthToken));
             Expression length = ParseExpr();
             return new OsBreadStatement
             {
                 Byte = byt,
-                FileVar = fileVar.Text,
+                FileVariable = new IdExpression(fileVar.Text, IdentifierType.Reference), 
                 Length = length,
-                Variable = variable.Text
+                Variable = new IdExpression(variable.Text)
             };
         }
 
         Statement ParseBRemoveStmt()
         {
-            if (!NextTokenIs(out Token var, typeof(IdentifierToken)))
-            {
-                throw new InvalidOperationException("Expected identifier.");
-            }
-            ExpectToken(typeof(FromToken));
+            Token variable = ConsumeIdToken();
+            ConsumeToken(typeof(FromToken));
             Expression from = ParseExpr();
-            ExpectToken(typeof(AtToken));
-            if (!NextTokenIs(out Token pos, typeof(IdentifierToken)))
-            {
-                throw new InvalidOperationException("Expected identifier.");
-            }
-            ExpectToken(typeof(SettingToken));
-            if (!NextTokenIs(out Token flag, typeof(IdentifierToken)))
-            {
-                throw new InvalidOperationException("Expected identifier.");
-            }
+            ConsumeToken(typeof(AtToken));
+            Token pos = ConsumeIdToken();
+            ConsumeToken(typeof(SettingToken));
+            Token flag = ConsumeIdToken();
             return new BRemoveStatement
             {
-                Var = var.Text,
+                Variable = new IdExpression(variable.Text),
                 From = from,
-                Pos = pos.Text,
-                Flag = flag.Text
+                Pos = new IdExpression(pos.Text),
+                Flag = new IdExpression(flag.Text)
             };
+        }
 
+        Statement ParseMatrixAssignmentStmt (Token token)
+        {
+            Expression row = ParseExpr();
+            Expression col = null;
+            if (NextTokenIs(typeof(CommaToken)))
+            {
+                col = ParseExpr();
+            }
+            ConsumeToken(typeof(RParenToken));
+            ConsumeToken(typeof(EqualToken));
+            Expression value = ParseExpr();
 
+            return new MatAssignmentStatement
+            {
+                Value = value,
+                Col = col,
+                Row = row,
+                Variable = new IdExpression(token.Text, IdentifierType.Assignment)
+            };
         }
 
         public Statement ParseStmt(bool inLoop = false)
@@ -1370,9 +1263,13 @@ namespace BasicPlusParser
                 {
                     return ParseConcatAssignmentStmt(token);
                 }
-                else if (token.DisallowFunction == false && NextTokenIs(typeof(LParenToken)))
+                else if (!token.DisallowFunction && !IsMatrix(token) && NextTokenIs(typeof(LParenToken)))
                 {
                     return ParseFunctionCallStmt(token);
+                }
+                else if (IsMatrix(token) && NextTokenIs(typeof(LParenToken)))
+                {
+                    return ParseMatrixAssignmentStmt(token);
                 }
                 else if (token is IfToken)
                 {
@@ -1428,7 +1325,7 @@ namespace BasicPlusParser
                 }
                 else if (token is MatToken)
                 {
-                    return ParseMatAssignmentStmt();
+                    return ParseMatStmt();
                 }
                 else if (token is SwapToken)
                 {
@@ -1590,6 +1487,10 @@ namespace BasicPlusParser
             {
                 return ParseEndStmt();
             }
+            else if (token is SemiColonToken)
+            {
+                return new EmptyStatement();
+            }
             throw new InvalidOperationException($"Not a valid statement {token}");
         }
 
@@ -1605,19 +1506,16 @@ namespace BasicPlusParser
         Statement ParseOsOpenStmt()
         {
             Expression filePath = ParseExpr();
-            ExpectToken(typeof(ToToken));
-            if(!NextTokenIs(out Token variable, typeof(IdentifierToken))){
-                throw new InvalidOperationException("Expected identifier.");
-            }
-
+            ConsumeToken(typeof(ToToken));
+            Token variable = ConsumeIdToken();
             (List<Statement> thenBlock, List<Statement> elseBlock) = ParseThenElseBlock();
 
             return new OsOpenStatement
             {
                 FilePath = filePath,
-                Variable = variable.Text,
-                ElseBlock = elseBlock,
-                ThenBlock = thenBlock
+                Variable = new IdExpression(variable.Text),
+                Else = elseBlock,
+                Then = thenBlock
             };
         }
 
@@ -1656,15 +1554,15 @@ namespace BasicPlusParser
 
                 if (optoken is OrToken)
                 {
-                    expr = new OrExpression(optoken, expr, right);
+                    expr = new OrExpression { Left = expr, Right = right, Operator = optoken.Text };
                 }
                 else if (optoken is MatchesToken)
                 {
-                    expr = new MatchesExpression(optoken, expr, right);
+                    expr = new MatchesExpression { Left = expr, Right = right, Operator = optoken.Text };
                 }
                 else
                 {
-                    expr = new AndExpression(optoken, expr, right);
+                    expr = new AndExpression { Left = expr, Right = right, Operator = optoken.Text };
                 }
             }
             return expr;
@@ -1690,14 +1588,14 @@ namespace BasicPlusParser
 
                 if  (optoken is LAngleBracketToken && NextTokenIs(typeof(RAngleBracketToken))){
                     right = ParseConcatExpr();
-                    expr = new NotEqExpression(optoken, expr, right);
+                    expr = new NotEqExpression { Left = expr, Right = right, Operator = optoken.Text };
                     continue;
                 }
 
                 if (optoken is RAngleBracketToken && NextTokenIs(typeof(EqualToken)))
                 {
                     right = ParseConcatExpr();
-                    expr = new GtEqExpression(optoken, expr, right);
+                    expr = new GtEqExpression { Left = expr, Right = right, Operator = optoken.Text };
                     continue;
                 }
 
@@ -1705,27 +1603,27 @@ namespace BasicPlusParser
                 
                 if (optoken is LAngleBracketToken || optoken is LtToken || optoken is LteToken || optoken is LtxToken)
                 {
-                  expr = new LtExpression(optoken, expr, right);
+                  expr = new LtExpression { Left = expr, Right = right, Operator = optoken.Text };
                 }
                 else if (optoken is RAngleBracketToken || optoken is GtToken || optoken is GtxToken || optoken is GtcToken)
                 {
-                    expr = new GtExpression(optoken, expr, right);
+                    expr = new GtExpression { Left = expr, Right = right, Operator = optoken.Text };
                 }
                 else if (optoken is ExcalmEqToken || optoken is HashTagToken || optoken is NeToken || optoken is NexToken || optoken is NecToken )
                 {
-                    expr = new NotEqExpression(optoken, expr, right);
+                    expr = new NotEqExpression { Left = expr, Right = right, Operator = optoken.Text };
                 }
                 else if (optoken is LteToken || optoken is LeToken || optoken is LexToken || optoken is LecToken)
                 {
-                    expr = new LtEqExpression(optoken, expr, right);
+                    expr = new LtEqExpression { Left = expr, Right = right, Operator = optoken.Text };
                 }
                 else if (optoken is GeToken || optoken is GecToken || optoken is GexToken)
                 {
-                    expr = new GtEqExpression(optoken, expr, right);
+                    expr = new GtEqExpression { Left = expr, Right = right, Operator = optoken.Text };
                 }
                 else
                 {
-                    expr = new EqExpression(optoken, expr, right);
+                    expr = new EqExpression { Left = expr, Right = right, Operator = optoken.Text };
                 }
             }
             return expr;
@@ -1741,12 +1639,12 @@ namespace BasicPlusParser
 
                 if (optoken is MultiValueConcatToken)
                 {
-                    expr = new MultiValueConcatExpression(optoken, expr, right);
+                    expr = new MultiValueConcatExpression { Left = expr, Right = right, Operator = optoken.Text };
 
                 }
                 else
                 {
-                    expr = new ConcatExpression(optoken, expr, right);
+                    expr = new ConcatExpression { Left = expr, Right = right, Operator = optoken.Text };
                 }
             }
             return expr;
@@ -1762,19 +1660,19 @@ namespace BasicPlusParser
                 Expression right = this.ParseMulExpr();
                 if (optoken is PlusToken)
                 {
-                    expr = new AddExpression(optoken, expr, right);
+                    expr = new AddExpression { Left = expr, Right = right, Operator = optoken.Text };
                 }
                 else if(optoken is MultiValueAddToken)
                 {
-                    expr = new MultiValueAddExpression(optoken, expr, right);
+                    expr = new MultiValueAddExpression { Left = expr, Right = right, Operator = optoken.Text };
                 }
                 else if(optoken is MultiValueSubToken)
                 {
-                    expr = new MultiValueSubExpression(optoken, expr, right);
+                    expr = new MultiValueSubExpression { Left = expr, Right = right, Operator = optoken.Text };
                 }
                 else
                 {
-                    expr = new SubExpression(optoken, expr, right);
+                    expr = new SubExpression { Left = expr, Right = right, Operator = optoken.Text };
                 }
             }
             return expr;
@@ -1788,8 +1686,8 @@ namespace BasicPlusParser
                 indexes.Add(ParseExpr());
 
             } while (NextTokenIs(typeof(CommaToken)));
-            ExpectToken(typeof(RSqrBracketToken));
-            return new ArrayInitExpression(token, indexes.ToArray());
+            ConsumeToken(typeof(RSqrBracketToken));
+            return new ArrayInitExpression{ Sequence = indexes };
 
 
         }
@@ -1804,19 +1702,19 @@ namespace BasicPlusParser
                 Expression right = ParsePowerExpr();
                 if (optoken is StarToken)
                 {
-                    expr = new MulExpression(optoken, expr, right);
+                    expr = new MulExpression { Left = expr, Right = right, Operator = optoken.Text };
                 }
                 else if (optoken is MultiValueDivToken)
                 {
-                    expr = new MultiValueDivExpression(optoken, expr, right);
+                    expr = new MultiValueDivExpression { Left = expr, Right = right, Operator = optoken.Text };
                 }
                 else if (optoken is MultiValueMullToken)
                 {
-                    expr = new MultiValueMullExpression(optoken, expr, right);
+                    expr = new MultiValueMullExpression { Left = expr, Right = right, Operator = optoken.Text };
                 }
                 else
                 {
-                    expr = new DivExpression(optoken, expr, right);
+                    expr = new DivExpression { Left = expr, Right = right, Operator = optoken.Text };
                 }
             }
             return expr;
@@ -1829,7 +1727,7 @@ namespace BasicPlusParser
             while (NextTokenIs(out optoken, typeof(PowerToken)))
             {
                 Expression right = ParseAtom();
-                expr = new PowerExpression(optoken, expr, right);
+                expr = new PowerExpression { Left = expr, Right = right, Operator = optoken.Text };
             }
             return expr;
         }
@@ -1845,7 +1743,7 @@ namespace BasicPlusParser
             if (NextTokenIs(typeof(ElseToken))){
                 elseBlock = ParseExpr();
             }
-            return new IfExpression(token, cond, thenBlock, elseBlock);
+            return new IfExpression { Then = thenBlock, Condition = cond, Else = elseBlock };
         }
 
 
@@ -1871,12 +1769,12 @@ namespace BasicPlusParser
             if (PeekNextToken() is RAngleBracketToken)
             {
                 _nextTokenIndex += 1;
-                indexes.Insert(0, baseExpr);
-                return new AngleArrExpression(token, indexes.ToArray());
+                return new AngleArrExpression { Indexes = indexes, Source = baseExpr };
             }
             else
             {
                 // We assumed that we had an array, but we do not.
+                // Backtrack.
                 _nextTokenIndex = tokenPos;
                 return null;
             }
@@ -1891,21 +1789,25 @@ namespace BasicPlusParser
                 indexes.Add(ParseExpr());
 
             } while (indexes.Count < 2 && NextTokenIs(typeof(CommaToken)));
-            ExpectToken(typeof(RSqrBracketToken));
-            indexes.Insert(0, expr);
-            return new SqrArrExpression(token, indexes.ToArray());
+            ConsumeToken(typeof(RSqrBracketToken));
+            return new SqrArrExpression { Indexes = indexes, Source = expr};
         }
 
         Expression ParseFunc(Token token)
         {
             List<Expression> args = new List<Expression>();
-            while(!NextTokenIs(typeof(RParenToken)) && args.Count < MAX_PARAMS)
+            while (!NextTokenIs(typeof(RParenToken)) && args.Count < MAX_PARAMS)
             {
-                args.Add(ParseExpr());
+                Expression arg = ParseExpr();
+                if (arg is IdExpression)
+                {
+                    ((IdExpression)arg).IdentifierType = IdentifierType.Assignment;
+                }
+                args.Add(arg);
                 NextTokenIs(typeof(CommaToken));
 
-            } 
-            return new FuncExpression(token, args.ToArray());
+            }
+            return new FuncExpression { Args = args, Function = new IdExpression(token.Text, IdentifierType.Function) };
         }
 
         Expression ParseAtom()
@@ -1922,7 +1824,7 @@ namespace BasicPlusParser
                 }
                 else
                 {
-                    expr = new IdExpression(token);
+                    expr = new IdExpression (token.Text, IdentifierType.Reference);
                 }
 
             }
@@ -1932,30 +1834,30 @@ namespace BasicPlusParser
             }
             else if (token is NumberToken)
             {
-                expr = new NumExpression(token);
+                expr = new NumExpression { Value = token.Text };
             }
 
             else if (token is StringToken)
             {
-                expr = new StringExpression(token);
+                expr = new StringExpression { Value = token.Text };
             }
             else if (token is LParenToken)
             {
                 expr = ParseExpr();
-                ExpectToken(typeof(RParenToken));
+                ConsumeToken(typeof(RParenToken));
             }
             else if (token is LCurlyToken)
             {
                 expr = ParseExpr();
-                ExpectToken(typeof(RCurlyToken));
-                expr = new CurlyExpression(token, expr);
+                ConsumeToken(typeof(RCurlyToken));
+                expr = new CurlyExpression { Value = expr };
             }
             else if (token is MinusToken) {
-                expr = new NegateExpression(token, ParseAtom());
+                expr = new NegateExpression { Operator = token.Text, Argument = ParseAtom() };
             }
             else if (token is NullToken)
             {
-                expr = new NullExpression(token);
+                expr = new NullExpression();
             }
             else if (token is LSqrBracketToken)
             {
@@ -1990,11 +1892,11 @@ namespace BasicPlusParser
         }
 
 
-        Token PeekNextToken()
+        Token PeekNextToken(int lookAhead = 0)
         {
-            if (_nextTokenIndex < _tokens.Count)
+            if (_nextTokenIndex + lookAhead < _tokens.Count)
             {
-                return _tokens[_nextTokenIndex];
+                return _tokens[_nextTokenIndex + lookAhead];
             }
             return null;
         }
@@ -2046,30 +1948,84 @@ namespace BasicPlusParser
             }
         }
 
+
+        Token ConsumeToken(string errMsg = null, bool optional = false, params Type[] expected)
+        {
+            Token token = PeekNextToken();
+            if (!expected.Any(t => t == token.GetType()))
+            {
+                if (optional)
+                {
+                    return null;
+                }
+
+                if (errMsg == null)
+                {
+                    errMsg = $"Expected {expected}";
+                }
+                _parseErrors.ReportError(_nextToken.LineNo, errMsg);
+                throw new ParseException();
+            }
+            return _tokens[_nextTokenIndex++];
+        }
+
+        Token ConsumeToken(Type expected, string errMsg = null, bool optional = false)
+        {
+            Token token = PeekNextToken();
+            if (token.GetType() != expected)
+            {
+                if (optional)
+                {
+                    return null;
+                }
+
+                if (errMsg == null)
+                {
+                    errMsg = $"Expected {expected}";
+                }
+                _parseErrors.ReportError(_nextToken.LineNo, errMsg);
+                throw new ParseException();
+            }
+            return _tokens[_nextTokenIndex++];
+        }
+
+        Token ConsumeIdToken(string message = "Identifier expected.")
+        {
+            Token token = PeekNextToken();
+            if (token.GetType() != typeof(IdentifierToken))
+            {
+                _parseErrors.ReportError(_nextToken.LineNo, message);
+                throw new ParseException();
+            }
+            return _tokens[_nextTokenIndex++];
+        }
+
+
         bool NextTokenIs(params Type[] validTokens)
         {
             return NextTokenIs(out Token token, validTokens);
         }
 
-        void ExpectStatementEnd()
+        void ExpectStatementSeparator()
         {
             if (PeekNextToken() is EofToken)
             {
                 return;
             }
 
-            if (NextTokenIs(typeof(SemiColonToken))){
-                if (NextTokenIs(typeof(NewLineToken))) {
-                }
-
-            } else if (NextTokenIs(typeof(NewLineToken)))
+            if (NextTokenIs(typeof(NewLineToken)))
             {
-                //Good
-            } else
-            {
-                throw new InvalidOperationException("Statement not terminated properly");
+                return;
             }
 
+            if (NextTokenIs(typeof(SemiColonToken)))
+            {
+                NextTokenIs(typeof(NewLineToken));
+                return;
+            }
+
+
+            throw new InvalidOperationException("Statement not terminated properly");
         }
 
         bool IsProgramEnd()
@@ -2081,6 +2037,11 @@ namespace BasicPlusParser
         bool IsStatementEnd()
         {
             return PeekNextToken() is EofToken || PeekNextToken()  is NewLineToken || PeekNextToken()  is SemiColonToken;
+        }
+
+        int GetLineNo()
+        {
+            return PeekNextToken().LineNo;
         }
     }
 }

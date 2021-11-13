@@ -1,10 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using BasicPlusParser.Statements.Expressions;
+using System.Collections.Generic;
 
 namespace BasicPlusParser.Statements
 {
     public class CommonStatement : Statement
     {
-        public string CommonName;
-        public List<string> GlovalVars = new();
+        public IdExpression CommonName;
+        public List<IdExpression> GlovalVars = new();
     }
 }

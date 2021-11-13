@@ -1,11 +1,7 @@
-﻿using BasicPlusParser.Tokens;
-
-namespace BasicPlusParser
+﻿namespace BasicPlusParser.Statements.Expressions
 {
-    class AndExpression : Expression
-
+    class AndExpression : BinaryExpression
     {
-        public AndExpression(Token token, params Expression[] children) : base(token, children) { }
-    }
 
+    }
 }

@@ -2,22 +2,12 @@
 using System.Linq;
 
 
-namespace BasicPlusParser
+namespace BasicPlusParser.Statements.Expressions
 {
-    class ComparisonExpression : Expression
+    class ComparisonExpression : BinaryExpression
     {
         public bool CaseSensitieve = true;
         public bool FullPrecision = false;
-
-        public ComparisonExpression(Token token, params Expression[] children) : base(token, children)
-
-        {
-            if (token.Text.ToLower().Last() == 'c'){
-                CaseSensitieve = true;
-            } else if(token.Text.ToLower().Last() == 'x')
-            {
-                FullPrecision = true;
-            }
-        }
+        
     }
 }

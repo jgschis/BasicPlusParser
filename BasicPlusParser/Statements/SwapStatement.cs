@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using BasicPlusParser.Statements.Expressions;
 
 namespace BasicPlusParser.Statements
 {
@@ -10,6 +11,6 @@ namespace BasicPlusParser.Statements
     {
         public Expression Old;
         public Expression New;
-        public string Name;
+        public IdExpression Variable;
     }
 }

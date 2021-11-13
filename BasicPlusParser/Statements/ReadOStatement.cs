@@ -3,16 +3,16 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using BasicPlusParser.Statements.Expressions;
 
 namespace BasicPlusParser
 {
-    public class ReadOStatement : Statement
+    public class ReadOStatement : ThenElseStatement
     {
-        public string Variable;
+       
+        public IdExpression Variable;
         public Expression TableVar;
         public Expression Key;
-        public List<Statement> Then;
-        public List<Statement> Else;
         public Expression Cursor;
     }
 }

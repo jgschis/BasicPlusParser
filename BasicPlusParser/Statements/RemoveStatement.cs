@@ -3,14 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using BasicPlusParser.Statements.Expressions;
 
 namespace BasicPlusParser.Statements
 {
     public class RemoveStatement : Statement
     {
-        public string Flag;
-        public string Pos;
+        public IdExpression Flag;
+        public IdExpression Pos;
         public Expression From;
-        public string Var;
+        public IdExpression Variable;
     }
 }

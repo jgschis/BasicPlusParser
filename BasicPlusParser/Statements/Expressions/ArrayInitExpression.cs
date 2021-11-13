@@ -9,7 +9,6 @@ namespace BasicPlusParser.Statements.Expressions
 {
     class ArrayInitExpression : Expression
     {
-        public ArrayInitExpression(Token token, params Expression[] children) : base(token, children) { }
-
+        public List<Expression> Sequence;
     }
 }

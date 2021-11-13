@@ -5,10 +5,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BasicPlusParser
+namespace BasicPlusParser.Statements.Expressions
 {
-    public class MatchesExpression : Expression
+    public class MatchesExpression : BinaryExpression
     {
-        public MatchesExpression(Token token, params Expression[] children) : base(token, children) { }
+
     }
 }

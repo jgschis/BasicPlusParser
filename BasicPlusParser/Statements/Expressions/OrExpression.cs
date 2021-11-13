@@ -5,12 +5,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BasicPlusParser
+namespace BasicPlusParser.Statements.Expressions
 {
-    class OrExpression : Expression
-
+    class OrExpression : BinaryExpression
     {
-        public OrExpression(Token token, params Expression[] children) : base(token, children) { }
-    }
 
+    }
 }

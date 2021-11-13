@@ -1,4 +1,5 @@
-﻿using System;
+﻿using BasicPlusParser.Statements.Expressions;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,7 +9,7 @@ namespace BasicPlusParser.Statements
 {
     public class EquStatemnet : Statement
     {
-        public Expression Id;
-        public Expression Val;
+        public IdExpression Variable;
+        public Expression Value;
     }
 }

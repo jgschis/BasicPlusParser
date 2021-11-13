@@ -5,10 +5,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BasicPlusParser
+namespace BasicPlusParser.Statements.Expressions
 {
-    public class MultiValueConcatExpression : Expression
+    public class MultiValueConcatExpression : BinaryExpression
     {
-        public MultiValueConcatExpression(Token token, params Expression[] children) : base(token, children) { }
     }
 }

@@ -5,10 +5,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BasicPlusParser
+namespace BasicPlusParser.Statements.Expressions
 {
-    public class MultiValueMullExpression : Expression
+    public class MultiValueMullExpression : BinaryExpression
     {
-        public MultiValueMullExpression(Token token, params Expression[] children) : base(token, children) { }
     }
 }

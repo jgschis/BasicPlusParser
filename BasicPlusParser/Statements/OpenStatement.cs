@@ -3,14 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using BasicPlusParser.Statements.Expressions;
 
 namespace BasicPlusParser.Statements
 {
-    public class OpenStatement : Statement
+    public class OpenStatement : ThenElseStatement
     {
         public Expression Table;
-        public string Handle;
-        public List<Statement> Then;
-        public List<Statement> Else;
+        public IdExpression Handle;
     }
 }

@@ -5,10 +5,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BasicPlusParser
+namespace BasicPlusParser.Statements.Expressions
 {
     public class CurlyExpression : Expression
     {
-        public CurlyExpression(Token token, params Expression[] children) : base(token, children) { }
+        public Expression Value;
     }
 }

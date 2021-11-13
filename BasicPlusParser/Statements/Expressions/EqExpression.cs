@@ -5,10 +5,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BasicPlusParser
+namespace BasicPlusParser.Statements.Expressions
 {
-    class EqExpression : Expression
+    class EqExpression : BinaryExpression
     {
-        public EqExpression(Token token, params Expression[] children) : base(token, children) { }
     }
 }

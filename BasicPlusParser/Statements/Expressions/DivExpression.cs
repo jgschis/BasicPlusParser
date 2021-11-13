@@ -5,10 +5,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BasicPlusParser
+namespace BasicPlusParser.Statements.Expressions
 {
-    class DivExpression : Expression
+    class DivExpression : BinaryExpression
     {
-        public DivExpression(Token token, params Expression[] children) : base(token, children) { }
     }
 }

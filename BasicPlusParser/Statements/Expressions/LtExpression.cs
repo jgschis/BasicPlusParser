@@ -5,11 +5,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BasicPlusParser
+namespace BasicPlusParser.Statements.Expressions
 {
-    class LtExpression : Expression
+    class LtExpression : BinaryExpression
     {
-        public LtExpression(Token token, params Expression[] children) : base(token, children) { }
 
     }
 }

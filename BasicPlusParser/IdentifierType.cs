@@ -6,7 +6,12 @@ using System.Threading.Tasks;
 
 namespace BasicPlusParser
 {
-    class NoOpStmt : Statement
+    public enum IdentifierType
     {
+        Function,
+        Assignment,
+        Reference,
+        Label,
+        Insert
     }
 }

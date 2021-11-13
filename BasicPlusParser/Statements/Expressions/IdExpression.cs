@@ -5,11 +5,28 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BasicPlusParser
+namespace BasicPlusParser.Statements.Expressions
 {
-    class IdExpression : Expression
+    public class IdExpression : Expression
     {
-        public IdExpression(Token token, params Expression[] children) : base(token, children) { }
+        public string Name
+        {
+            set { NameRaw = value; }
+            get
+            {
+                return NameRaw?.ToLower();
+            }
+        }
+        public string NameRaw;
+
+
+        public IdentifierType IdentifierType;
+
+        public IdExpression(string name, IdentifierType identifierType = IdentifierType.Assignment)
+        {
+            Name = name;
+            IdentifierType = identifierType;
+        }
 
     }
 }

@@ -5,10 +5,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BasicPlusParser
+namespace BasicPlusParser.Statements.Expressions
 {
     public class IfExpression : Expression
     {
-        public IfExpression(Token token, params Expression[] children) : base(token, children) { }
+        public Expression Condition;
+        public Expression Then;
+        public Expression Else;
     }
 }

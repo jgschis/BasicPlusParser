@@ -1,4 +1,5 @@
-﻿using System;
+﻿using BasicPlusParser.Statements.Expressions;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,7 +9,7 @@ namespace BasicPlusParser
 {
     public class InternalSubStatement : Statement
     {
-        public string Name;
+        public IdExpression Label;
         public List<Statement> Statements = new List<Statement>();
     }
 }

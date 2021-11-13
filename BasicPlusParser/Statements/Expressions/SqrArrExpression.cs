@@ -5,11 +5,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BasicPlusParser
+namespace BasicPlusParser.Statements.Expressions
 {
     class SqrArrExpression : Expression
     {
-        public SqrArrExpression(Token token, params Expression[] children) : base(token, children) { }
-
+        public List<Expression> Indexes;
+        public Expression Source;
     }
 }

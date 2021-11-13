@@ -1,15 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
+using BasicPlusParser.Statements.Expressions;
 
 namespace BasicPlusParser
 {
     class AngleArrayAssignmentStatement : Statement
     {
-        public string Name;
-        public Expression Expr;
+        public IdExpression Variable;
+        public Expression Value;
         public List<Expression> Indexes;
     }
 }

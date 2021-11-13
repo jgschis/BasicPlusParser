@@ -5,12 +5,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BasicPlusParser
+namespace BasicPlusParser.Statements.Expressions
 {
-    class FuncExpression : Expression
-
+    public class FuncExpression : Expression
     {
-        public FuncExpression(Token token, params Expression[] children) : base(token, children) { }
+        public IdExpression Function;
+        public List<Expression> Args;
     }
-
 }
