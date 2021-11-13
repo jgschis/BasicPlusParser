@@ -11,6 +11,7 @@ namespace BasicPlusParser.Tokens
         public int LineNo { get; set; }
         public string Text { get; set; }
         public int Pos { get; set; }
+        public int Col { get; set; }
         public bool DisallowFunction = false;
     }
 }

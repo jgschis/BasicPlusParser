@@ -1,371 +1,82 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
 using BasicPlusParser.Tokens;
 using System.Linq;
-
 
 namespace BasicPlusParser
 {
     public class Tokenizer
     {
+        int _pos = 0;
+        List<Token> _tokens = new();
+        string _source;
+        Token _prevToken => _tokens.Count > 0 ? _tokens.Last() : null;
+        public ParseErrors Error;
+        int _col;
+        int _lineNo = 1;
 
-        private int _pos = 0;
-        private List<Tokens.Token> _tokens = new List<Tokens.Token>();
-        private string _origText;
-        Tokens.Token _prevToken => _tokens.Count > 0 ? _tokens.Last() : null;
-
-        static Regex _numRegEx = new Regex(@"^[0-9]+(\.[0-9]*)?",RegexOptions.IgnoreCase);
-        static Regex _idRegEx = new Regex(@"^[a-zA-Z_@][a-zA-Z_$0-9@\.]*", RegexOptions.IgnoreCase);
-        static Regex _whiteSpaceRegEx = new Regex(@"\s", RegexOptions.IgnoreCase);
-        static Regex _hexNumRegEx = new Regex(@"^0x[0-9a-f]+", RegexOptions.IgnoreCase);
-        static Regex _slashHexNumRegEx = new Regex(@"^\\[0-9a-f]+\\", RegexOptions.IgnoreCase);
-
-
-        public Tokenizer(string text)
+        bool IsAtEnd()
         {
-            _origText = text;
+            return _pos >= _source.Length;
         }
 
-
-        bool TryMatch(Regex regEx, string text, out Match match)
+         bool Match(char expected)
         {
-            match = regEx.Match(text);
-            return match.Success;
+            if (IsAtEnd()) return false;
+            if (_source[_pos] != expected) return false;
+
+            _pos++;
+            return true;
         }
 
+        char Advance() {
+            return _source[_pos++];
+        }
 
-        bool TryMatch(string target, string text, out string match)
+        bool Match(string expected)
         {
-            match = null;
-            if (text.StartsWith(target,StringComparison.OrdinalIgnoreCase))
-            {
-                match = text.Substring(0, target.Length);
+            if (IsAtEnd()) return false;
+            if (_source.Substring(_pos).StartsWith(expected, StringComparison.OrdinalIgnoreCase)){
+                _pos += expected.Length;
                 return true;
             }
-            else
-            {
-                return false;
-            } 
-        }
-
-        bool TryMatchString(string text, out StringToken token)
-        {
-            token = null;
-            if (!(text.StartsWith("'") || text.StartsWith("\"")))
-            {
-                return false;
-            }
-
-            int pos = 1;
-            char delim = text[0];
-            List<char> chars = new List<char>();
-            chars.Add(delim);
-            while (pos < text.Length)
-            {
-                char chr = text[pos];
-                if (chr == delim)
-                {
-                    chars.Add(delim);
-                    token = new StringToken { Text = new String(chars.ToArray()), Delim = delim };
-                    return true;
-                }
-                if (chr == '\r')
-                {
-                    if (chars.Count > 1 && chars[chars.Count - 1] == '|')
-                    {
-                        chars.RemoveAt(chars.Count - 1);
-                        pos += 2;
-                        continue;
-                    }
-                    else
-                    {
-                        throw new InvalidOperationException("Sring contanis new line char.");
-                    }
-                }
-                chars.Add(chr);
-                pos += 1;
-            }
-            throw new InvalidOperationException("String is not delimited.");
-        }
-
-        bool TryMatchMultiLineComment(string text, out CommentToken token)
-        {
-            token = new CommentToken();
-            if (text.StartsWith("/*"))
-            {
-                int index;
-                if ( text.Length >= 4 && (index = text.Substring(1).IndexOf("*/")) > 0)
-                {
-                    token.Text = text.Substring(0, index + 3);
-                    return true;
-                } else
-                {
-                    throw new InvalidOperationException("Comment not delimited with */");
-                }
-            }
             return false;
-        }
-
-        bool TryMatchSingleLineComment(string text, out CommentToken token)
-        {
-            // This will try each test.
-            // The longest match that appearst highest in this function will be chosen.
-
-
-            token = new CommentToken();
-            if (text.StartsWith("//") || text.StartsWith("!") || text.StartsWith("*"))
-            {
-                List<char> comment = new List<char>();
-                foreach (char chr in text)
-                {
-                    if (chr == '\r')
-                    {
-                        break;
-                    }
-                    comment.Add(chr);
-                }
-                token.Text = new string(comment.ToArray()); ;
-                return true;
-                
-            }
-            return false;
-        }
-        bool TryMatchCommonName(string text, out CommonNameToken token)
-        {
-            token = new CommonNameToken();
-            List<char> name = new List<char>();
-            int pos = 1;
-            if (text.StartsWith('/') && _prevToken is CommonToken)
-            {
-                name.Add('/');
-                if (text.Length > 1 && text[1] == '/')
-                {
-                    name.Add('/');
-                    pos += 1;
-                }
-
-                while(pos < text.Length)
-                {
-                    char chr = text[pos];
-
-                    if (chr == '\r')
-                    {
-                        throw new InvalidOperationException("New line not allowed in common block.");
-                    }
-
-                    if (chr == '/')
-                    {
-                        string end = new string (text.Substring(pos).TakeWhile(x => x == '/').ToArray());
-                        token.Text = new string(name.ToArray()) + end;
-                        return true;
-                    }
-
-                    pos += 1;
-                    name.Add(chr);
-                }
-            }
-
-
-            return false;
-        }
-
-        IEnumerable<Token> GetMatchingTokens(string text)
-        {
-            Match match;
-            string found;
-
-            // The //, * and ! comments must be the first thing on a line.
-            if (_prevToken is NewLineToken || _prevToken is SemiColonToken || _prevToken == null)
-            {
-                if (TryMatchSingleLineComment(text, out CommentToken singleLineCommentToken)) yield return singleLineCommentToken;
-            }
-            if (TryMatchMultiLineComment(text, out CommentToken multieLineCommentToken)) yield return multieLineCommentToken;
-
-            // Operators
-            if (TryMatch("<=", text, out found)) yield return new LteToken { Text = found };
-            if (TryMatch("and", text, out found)) yield return new AndToken { Text = found };
-            if (TryMatch("or", text, out found)) yield return new OrToken { Text = found };
-            if (TryMatch("!=", text, out found)) yield return new ExcalmEqToken { Text = found };
-            if (TryMatch("#", text, out found)) yield return new HashTagToken { Text = found };
-            if (TryMatch("+", text, out found)) yield return new PlusToken { Text = found };
-            if (TryMatch("-", text, out found)) yield return new MinusToken { Text = found };
-            if (TryMatch("/", text, out found)) yield return new SlashToken { Text = found };
-            if (TryMatch("*", text, out found)) yield return new StarToken { Text = found };
-            if (TryMatch("<", text, out found)) yield return new LAngleBracketToken { Text = found };
-            if (TryMatch(">", text, out found)) yield return new RAngleBracketToken { Text = found };
-            if (TryMatch(",", text, out found)) yield return new CommaToken { Text = found };
-            if (TryMatch("]", text, out found)) yield return new RSqrBracketToken { Text = found };
-            if (TryMatch("[", text, out found)) yield return new LSqrBracketToken { Text = found };
-            if (TryMatch(")", text, out found)) yield return new RParenToken { Text = found };
-            if (TryMatch("(", text, out found)) yield return new LParenToken { Text = found };
-            if (TryMatch("=", text, out found)) yield return new EqualToken { Text = found };
-            if (TryMatch(";", text, out found)) yield return new SemiColonToken { Text = found };
-            if (TryMatch(":", text, out found)) yield return new ColonToken { Text = found };
-            if (TryMatch("+=", text, out found)) yield return new PlusEqualToken { Text = found };
-            if (TryMatch("/=", text, out found)) yield return new SlashEqualToken { Text = found };
-            if (TryMatch("*=", text, out found)) yield return new StarEqualToken { Text = found };
-            if (TryMatch(":=", text, out found)) yield return new ColonEqualToken { Text = found };
-            if (TryMatch("-=", text, out found)) yield return new MinusEqualToken { Text = found };
-            if (TryMatch("{", text, out found)) yield return new LCurlyToken { Text = found };
-            if (TryMatch("}", text, out found)) yield return new RCurlyToken { Text = found };
-            if (TryMatch("**", text, out found)) yield return new PowerToken { Text = found };
-            if (TryMatch("***", text, out found)) yield return new MultiValueMullToken { Text = found };
-            if (TryMatch("///", text, out found)) yield return new MultiValueDivToken { Text = found };
-            if (TryMatch("+++", text, out found)) yield return new MultiValueAddToken { Text = found };
-            if (TryMatch("---", text, out found)) yield return new MultiValueSubToken { Text = found };
-            if (TryMatch(":::", text, out found)) yield return new MultiValueConcatToken { Text = found };
-            if (TryMatch("ge", text, out found)) yield return new GeToken { Text = found };
-            if (TryMatch("ne", text, out found)) yield return new NeToken { Text = found };
-            if (TryMatch("lt", text, out found)) yield return new LtToken { Text = found };
-            if (TryMatch("le", text, out found)) yield return new LeToken { Text = found };
-            if (TryMatch("gt", text, out found)) yield return new GtToken { Text = found };
-            if (TryMatch("eq", text, out found)) yield return new EqToken { Text = found };
-            if (TryMatch("_eqc", text, out found)) yield return new EqcToken { Text = found };
-            if (TryMatch("_neq", text, out found)) yield return new NecToken { Text = found };
-            if (TryMatch("_ltc", text, out found)) yield return new LtcToken { Text = found };
-            if (TryMatch("_leq", text, out found)) yield return new LecToken { Text = found };
-            if (TryMatch("_gtc", text, out found)) yield return new GtcToken { Text = found };
-            if (TryMatch("_gec", text, out found)) yield return new GecToken { Text = found };
-            if (TryMatch("_eqx", text, out found)) yield return new EqxToken { Text = found };
-            if (TryMatch("_nex", text, out found)) yield return new NexToken { Text = found };
-            if (TryMatch("_ltx", text, out found)) yield return new LtxToken { Text = found };
-            if (TryMatch("_gtx", text, out found)) yield return new GtxToken { Text = found };
-            if (TryMatch("_lex", text, out found)) yield return new LexToken { Text = found };
-            if (TryMatch("_gex", text, out found)) yield return new GexToken { Text = found };
             
-            // Keywords
-            if (TryMatch("loop",text, out found)) yield return new LoopToken { Text = found };
-            if (TryMatch("repeat", text, out found)) yield return new RepeatToken { Text = found };
-            if (TryMatch("if", text, out found)) yield return new IfToken { Text = found };
-            if (TryMatch("then", text, out found)) yield return new ThenToken { Text = found };
-            if (TryMatch("function", text, out found)) yield return new FunctionToken { Text = found };
-            if (TryMatch("subroutine", text, out found)) yield return new SubroutineToken { Text = found };
-            if (TryMatch("end", text, out found)) yield return new EndToken { Text = found };
-            if (TryMatch("else", text, out found)) yield return new ElseToken { Text = found };
-            if (TryMatch("begin", text, out found)) yield return new BeginToken { Text = found };
-            if (TryMatch("case", text, out found)) yield return new CaseToken { Text = found };
-            if (TryMatch("return", text, out found)) yield return new ReturnToken { Text = found };
-            if (TryMatch("for", text, out found)) yield return new ForToken { Text = found };
-            if (TryMatch("next", text, out found)) yield return new NextToken { Text = found };
-            if (TryMatch("while", text, out found)) yield return new WhileToken { Text = found };
-            if (TryMatch("until", text, out found)) yield return new UntilToken { Text = found };
-            if (TryMatch("gosub", text, out found)) yield return new GosubToken { Text = found };
-            if (TryMatch("to", text, out found)) yield return new ToToken { Text = found };
-            if (TryMatch("equ", text, out found)) yield return new EquToken { Text = found };
-            if (TryMatch("swap", text, out found)) yield return new SwapToken { Text = found };
-            if (TryMatch("in", text, out found)) yield return new InToken { Text = found };
-            if (TryMatch("with", text, out found)) yield return new WithToken { Text = found };
-            if (TryMatch("convert", text, out found)) yield return new ConvertToken { Text = found };
-            if (TryMatch("step", text, out found)) yield return new StepToken { Text = found };
-            if (TryMatch("$insert", text, out found)) yield return new InsertToken { Text = found };
-            if (TryMatch("declare", text, out found)) yield return new DeclareToken { Text = found };
-            if (TryMatch("call", text, out found)) yield return new CallToken { Text = found };
-            if (TryMatch("remove", text, out found)) yield return new RemoveToken { Text = found };
-            if (TryMatch("from", text, out found)) yield return new FromToken { Text = found };
-            if (TryMatch("at", text, out found)) yield return new AtToken { Text = found };
-            if (TryMatch("setting", text, out found)) yield return new SettingToken { Text = found };
-            if (TryMatch("mat", text, out found)) yield return new MatToken { Text = found };
-            if (TryMatch("locate", text, out found)) yield return new LocateToken { Text = found };
-            if (TryMatch("using", text, out found)) yield return new UsingToken { Text = found };
-            if (TryMatch("null", text, out found)) yield return new NullToken { Text = found };
-            if (TryMatch("read", text, out found)) yield return new ReadToken { Text = found };
-            if (TryMatch("write", text, out found)) yield return new WriteToken { Text = found };
-            if (TryMatch("delete", text, out found)) yield return new DeleteToken { Text = found };
-            if (TryMatch("lock", text, out found)) yield return new LockToken { Text = found };
-            if (TryMatch("unlock", text, out found)) yield return new UnlockToken { Text = found };
-            if (TryMatch("open", text, out found)) yield return new OpenToken { Text = found };
-            if (TryMatch("debug", text, out found)) yield return new DebugToken { Text = found };
-            if (TryMatch("cursor", text, out found)) yield return new CursorToken { Text = found };
-            if (TryMatch("on", text, out found)) yield return new OnToken { Text = found };
-            if (TryMatch("clearselect", text, out found)) yield return new ClearSelectToken { Text = found };
-            if (TryMatch("readnext", text, out found)) yield return new ReadNextToken { Text = found };
-            if (TryMatch("do", text, out found)) yield return new DoToken { Text = found };
-            if (TryMatch("all", text, out found)) yield return new AllToken { Text = found };
-            if (TryMatch("goto", text, out found)) yield return new GoToToken { Text = found };
-            if (TryMatch("transfer", text, out found)) yield return new TransferToken { Text = found };
-            if (TryMatch("matread", text, out found)) yield return new MatReadToken { Text = found };
-            if (TryMatch("matwrite", text, out found)) yield return new MatWriteToken { Text = found };
-            if (TryMatch("oswrite", text, out found)) yield return new OsWriteToken { Text = found };
-            if (TryMatch("osread", text, out found)) yield return new OsReadToken { Text = found };
-            if (TryMatch("dimension", text, out found)) yield return new DimensionToken { Text = found };
-            if (TryMatch("dim", text, out found)) yield return new DimensionToken { Text = found };
-            if (TryMatch("#pragma", text, out found)) yield return new PragmaToken { Text = found };
-            if (TryMatch("output", text, out found)) yield return new OutputToken { Text = found };
-            if (TryMatch("precomp", text, out found)) yield return new PreCompToken { Text = found };
-            if (TryMatch("common", text, out found)) yield return new CommonToken { Text = found };
-            if (TryMatch("freecommon", text, out found)) yield return new FreeCommonToken { Text = found };
-            if (TryMatch("initrnd", text, out found)) yield return new InitRndToken { Text = found };
-            if (TryMatch("by", text, out found)) yield return new ByToken { Text = found };
-            if (TryMatch("select", text, out found)) yield return new SelectToken { Text = found };
-            if (TryMatch("equate", text, out found)) yield return new EquToken { Text = found };
-            if (TryMatch("garbagecollect", text, out found)) yield return new GarbageCollectToken { Text = found };
-            if (TryMatch("flush", text, out found)) yield return new FlushToken { Text = found };
-            if (TryMatch("readv", text, out found)) yield return new ReadVToken { Text = found };
-            if (TryMatch("reado", text, out found)) yield return new ReadOToken { Text = found };
-            if (TryMatch("matparse", text, out found)) yield return new MatParseToken { Text = found };
-            if (TryMatch("into", text, out found)) yield return new IntoToken { Text = found };
-            if (TryMatch("match", text, out found)) yield return new MatchesToken { Text = found };
-            if (TryMatch("matches", text, out found)) yield return new MatchesToken { Text = found };
-            if (TryMatch("initdir", text, out found)) yield return new InitDirToken { Text = found };
-            if (TryMatch("writev", text, out found)) yield return new WriteVToken { Text = found };
-            if (TryMatch("compile", text, out found)) yield return new CompileToken { Text = found };
-            if (TryMatch("osopen", text, out found)) yield return new OsOpenToken { Text = found };
-            if (TryMatch("osdelete", text, out found)) yield return new OsDeleteToken { Text = found };
-            if (TryMatch("osclose", text, out found)) yield return new OsCloseToken { Text = found };
-            if (TryMatch("osbread", text, out found)) yield return new OsBReadToken { Text = found };
-            if (TryMatch("osbwrite", text, out found)) yield return new OsBWriteToken { Text = found };
-            if (TryMatch("length", text, out found)) yield return new LengthToken { Text = found };
-            if (TryMatch("bremove", text, out found)) yield return new BRemoveToken { Text = found };
-
-            if (TryMatchCommonName(text, out CommonNameToken commonNameToken)) yield return commonNameToken;
-
-            if (TryMatch(_numRegEx, text, out match)) yield return new NumberToken { Text = match.Value };
-            if (TryMatch(_hexNumRegEx, text, out match)) yield return new NumberToken { Text = match.Value };
-            if (TryMatch(_slashHexNumRegEx, text, out match)) yield return new NumberToken { Text = match.Value };
-
-            if (TryMatch(_idRegEx, text, out match)) yield return new IdentifierToken { Text = match.Value };
-
-            if (TryMatchString(text, out StringToken strToken)) yield return strToken;
-            
-            if (TryMatch("\r\n", text, out found)) yield return new NewLineToken { Text = found };
-
-            if (TryMatch(_whiteSpaceRegEx, text, out match)) yield return new WhiteSpaceToken { Text = match.Value };
         }
 
-
-        int GetLineNo()
+        char Peek()
         {
-            int end = Math.Min(_pos, _origText.Length);
-            return _origText.Substring(0, end).Count(x => x == '\r') + 1;
+            if ( _pos  >= _source.Length ) return '\0';
+            return _source[_pos];
         }
+
+        public Tokenizer(string text, ParseErrors error)
+        {
+            Error = error;
+            _source = text;
+        }
+
+
 
         public List<Token> Tokenise()
         {
-            while (_pos < _origText.Length)
+            while (_pos < _source.Length)
             {
-                int maxLength = 0;
-                Token matchedToken = null;
-                foreach (Token candidate in GetMatchingTokens(_origText[_pos..]))
-                {
-                    if (candidate.Text.Length > maxLength)
-                    {
-                        maxLength = candidate.Text.Length;
-                        matchedToken = candidate;
-                    }
-                }
+                int start = _pos;
+                int startLineNo = _lineNo;
+                Token matchedToken = GetNextToken();
                 if (matchedToken != null)
                 {
-                    matchedToken.LineNo = GetLineNo();
-                    matchedToken.Pos = _pos;
-     
-                    if ((_prevToken is IfToken || _prevToken is ReturnToken) && matchedToken is WhiteSpaceToken)
+                    matchedToken.LineNo = startLineNo;
+                    matchedToken.Pos = start;
+                    //matchedToken.Col = _col;
+
+                    if (matchedToken is WhiteSpaceToken && (_prevToken is IfToken || _prevToken is ReturnToken ||
+                        _prevToken is WhileToken || _prevToken is UntilToken))
                     {
                         // Basic + allows keywords to be function names.
                         // However, if the keyword is followed by space,
                         // it does not allow the keyword to be a function name.
-                        // This logic enforces that absurd rule.
-                        // Though anyone who does this is an idiot.
                         _prevToken.DisallowFunction = true;
                     }
 
@@ -373,20 +84,395 @@ namespace BasicPlusParser
                         (matchedToken is NewLineToken && _prevToken is NewLineToken))
                     {
                         // We don't what junk white spaces, newlines and comments in the token list.
-                        _pos += maxLength;
                         continue;
                     }
-                  
                     _tokens.Add(matchedToken);
-                    _pos += maxLength;
+                }
+                else
+                {
+                    Error.ReportError(_lineNo, $"Unexpected character: {_source[_pos]}");
+                }
+
+            }
+            _tokens.Add(new EofToken { LineNo = _lineNo, Pos = _pos });
+            return _tokens;
+        }
+
+        public Token GetNextToken()
+        {
+            char character = Advance();
+            switch (character)
+            {
+                case '=':
+                    return new EqualToken { Text = "=" };
+                case '"':
+                    return ScanStringLiteral('"');
+                case '\'':
+                    return ScanStringLiteral('\'');
+                case '<':
+                    if (Match("=")) return new LteToken { Text = "<=" };
+                    else return new LAngleBracketToken { Text = character.ToString() };
+                case '#':
+                    if (Match("pragma")) return new PragmaToken { Text = "#pragma" };
+                    else return new HashTagToken { Text = character.ToString() };
+                case '+':
+                    if (Match("++")) return new MultiValueAddToken { Text = "+++" };
+                    else if (Match('=')) return new PlusEqualToken { Text = "+=" };
+                    else return new PlusToken { Text = "+" };
+                case '-':
+                    if (Match("--")) return new MultiValueSubToken { Text = "---" };
+                    else if (Match("=")) return new MinusEqualToken { Text = "-=" };
+                    else return new MinusToken { Text = "-" };
+                case '/':
+                    if (Match("//")) return new MultiValueDivToken { Text = "///" };
+                    else if (Match("=")) return new SlashEqualToken { Text = "/=" };
+                    else if (Match("/") && StartOfStmt()) return ScanSingleLineComment();
+                    else if (Match("*")) return ScanMultiLineComment();
+                    else if (_prevToken is CommonToken) return ScanCommonNameToken();
+                    else return new SlashToken { Text = "/" };
+                case '*':
+                    if (StartOfStmt()) return ScanSingleLineComment();
+                    else if (Match("=")) return new StarEqualToken { Text = "*=" };
+                    else if (Match("**")) return new MultiValueMullToken { Text = "***" };
+                    else if (Match("*")) return new PowerToken { Text = "**" };
+                    else return new StarToken { Text = character.ToString() };
+                case '!':
+                    if (Match("=")) return new ExcalmEqToken { Text = "!=" };
+                    else if (StartOfStmt()) return ScanSingleLineComment();
+                    else return new ExclamToken { Text = character.ToString() };
+                case ':':
+                    if (Match("::")) return new MultiValueConcatToken { Text = ":::" };
+                    else if (Match("=")) return new ColonEqualToken { Text = ":=" };
+                    else return new ColonToken { Text = character.ToString() };
+                case '>':
+                    return new RAngleBracketToken { Text = character.ToString() };
+                case ',':
+                    return new CommaToken { Text = character.ToString() };
+                case ']':
+                    return new RSqrBracketToken { Text = character.ToString() };
+                case '[':
+                    return new LSqrBracketToken { Text = character.ToString() };
+                case ')':
+                    return new RParenToken { Text = character.ToString() };
+                case '(':
+                    return new LParenToken { Text = character.ToString() };
+                case ';':
+                    return new SemiColonToken { Text = character.ToString() };
+                case '{':
+                    return new LCurlyToken { Text = character.ToString() };
+                case '}':
+                    return new RCurlyToken { Text = character.ToString() };
+                case '$' when Match("insert"):
+                    return new InsertToken { Text = "$insert" };
+                case '\\':
+                    return ScanNumber();
+                case '.':
+                    return ScanNumber();
+                case '\r':
+                    Match('\n');
+                    _lineNo++;
+                    while (Match("\r\n"))
+                    {
+                        _lineNo++;
+                    }
+                    return new NewLineToken { Text = "\r\n" };
+                case ' ':
+                case '\t':
+                    while (Match(' ') || Match('\t')) ;
+                    return new WhiteSpaceToken { Text = "" };
+                default:
+                    if (IsIdentifierOrKeyWord(character))
+                    {
+                        return ScanIdentifierOrKeyword();
+                    }
+                    else if (IsNumber(character))
+                    {
+                        return ScanNumber();
+                    }
+                    else
+                    {
+                        return null;
+                    }
+            }
+        }
+    
+        bool IsIdentifierOrKeyWord(char chr)
+        {
+            return (chr >= 'a' && chr <= 'z') ||
+                    (chr >= 'A' && chr <= 'Z') ||
+                        chr =='_' || chr == '@';
+        }
+
+        bool IsNumber(char chr, bool hexAllowed = false)
+        {
+            return chr >= '0' && chr <= '9' ||
+                (hexAllowed && (chr >= 'a' && chr <= 'f') || (chr >= 'A' && chr <= 'F'));
+        }
+
+
+        CommonNameToken ScanCommonNameToken()
+        {
+            CommonNameToken token = new CommonNameToken();
+            while( Match('/'));
+
+            int start = _pos;
+            while (Peek() != '/' && !IsAtEnd()) 
+            {
+                char chr = Advance();
+
+                if (chr == '\r')
+                {
+                    _pos -= 1;
+                    Error.ReportError(_lineNo, "New line is not allowed in common block.");
+                    return null;
+                }
+
+            }
+
+            if (IsAtEnd())
+            {
+                Error.ReportError(_lineNo,"A common block must end with /");
+                return null;
+            }
+
+            while (Match('/')) ;
+            token.Text = _source[start.._pos];
+            return token;    
+        }
+
+
+        bool StartOfStmt()
+        {
+            return (_prevToken is NewLineToken || _prevToken is SemiColonToken || _prevToken == null);
+        }
+
+        CommentToken ScanSingleLineComment()
+        {
+            int start = _pos;
+            while (Peek() != '\r' && !IsAtEnd())
+            {
+                char chr = Advance();
+            }
+            return new CommentToken { Text = _source[start.._pos]};
+
+    
+        }
+       
+        CommentToken ScanMultiLineComment()
+        {
+            int start = _pos;
+            while(!IsAtEnd())
+            {
+                char chr = Advance();
+                if (chr == '\r') _lineNo++;
+                if (chr == '*' && Match('/')){
+                    return new CommentToken { Text = _source[start..(_pos-2)]};
+                }
+            }
+            
+
+            Error.ReportError(_lineNo, "Multiline comment must be delimited with */");
+            return null;
+        }
+
+        StringToken ScanStringLiteral(char delim)
+        {
+            List<char> chars = new();
+            while (!Match(delim))
+            {
+                char chr = Advance();
+               
+                if (chr == '\r')
+                {
+                    if (chars.Count > 1 && chars.Last() == '|')
+                    {
+                        chars.RemoveAt(chars.Count - 1);
+                        Advance();
+                        _lineNo += 1;
+                        continue;
+                    }
+                    else
+                    {
+                        Error.ReportError(_lineNo,$"String is not enclosed by {delim}");
+                        return null;
+                    }
+                }
+                chars.Add(chr);
+            }
+
+            if (IsAtEnd())
+            {
+                Error.ReportError(_lineNo, $"String is not enclosed by {delim}");
+                return null;
+            }
+
+            return new StringToken { Text = new String(chars.ToArray()), Delim = delim };
+        }
+
+        Token ScanIdentifierOrKeyword()
+        {
+            int start = _pos - 1;
+            while (IsIdentifierOrKeyWord(Peek()) || IsNumber(Peek()) || Peek() == '.'  || Peek() == '$')
+            {
+                Advance();
+            }
+
+            string idOrKeyword = _source[start.._pos];
+
+            return idOrKeyword.ToLower() switch
+            {
+                "loop" => new LoopToken { Text = idOrKeyword },
+                "repeat" => new RepeatToken { Text = idOrKeyword },
+                "if" => new IfToken { Text = idOrKeyword },
+                "then" => new ThenToken { Text = idOrKeyword },
+                "function" => new FunctionToken { Text = idOrKeyword },
+                "subroutine" => new SubroutineToken { Text = idOrKeyword },
+                "end" => new EndToken { Text = idOrKeyword },
+                "else" => new ElseToken { Text = idOrKeyword },
+                "begin" => new BeginToken { Text = idOrKeyword },
+                "case" => new CaseToken { Text = idOrKeyword },
+                "return" => new ReturnToken { Text = idOrKeyword },
+                "for" => new ForToken { Text = idOrKeyword },
+                "next" => new NextToken { Text = idOrKeyword },
+                "while" => new WhileToken { Text = idOrKeyword },
+                "until" => new UntilToken { Text = idOrKeyword },
+                "gosub" => new GosubToken { Text = idOrKeyword },
+                "to" => new ToToken { Text = idOrKeyword },
+                "equ" => new EquToken { Text = idOrKeyword },
+                "swap" => new SwapToken { Text = idOrKeyword },
+                "in" => new InToken { Text = idOrKeyword },
+                "with" => new WithToken { Text = idOrKeyword },
+                "convert" => new ConvertToken { Text = idOrKeyword },
+                "step" => new StepToken { Text = idOrKeyword },
+                "declare" => new DeclareToken { Text = idOrKeyword },
+                "call" => new CallToken { Text = idOrKeyword },
+                "remove" => new RemoveToken { Text = idOrKeyword },
+                "from" => new FromToken { Text = idOrKeyword },
+                "at" => new AtToken { Text = idOrKeyword },
+                "setting" => new SettingToken { Text = idOrKeyword },
+                "mat" => new MatToken { Text = idOrKeyword },
+                "locate" => new LocateToken { Text = idOrKeyword },
+                "using" => new UsingToken { Text = idOrKeyword },
+                "null" => new NullToken { Text = idOrKeyword },
+                "read" => new ReadToken { Text = idOrKeyword },
+                "write" => new WriteToken { Text = idOrKeyword },
+                "delete" => new DeleteToken { Text = idOrKeyword },
+                "lock" => new LockToken { Text = idOrKeyword },
+                "unlock" => new UnlockToken { Text = idOrKeyword },
+                "open" => new OpenToken { Text = idOrKeyword },
+                "debug" => new DebugToken { Text = idOrKeyword },
+                "cursor" => new CursorToken { Text = idOrKeyword },
+                "on" => new OnToken { Text = idOrKeyword },
+                "clearselect" => new ClearSelectToken { Text = idOrKeyword },
+                "readnext" => new ReadNextToken { Text = idOrKeyword },
+                "do" => new DoToken { Text = idOrKeyword },
+                "all" => new AllToken { Text = idOrKeyword },
+                "goto" => new GoToToken { Text = idOrKeyword },
+                "transfer" => new TransferToken { Text = idOrKeyword },
+                "matread" => new MatReadToken { Text = idOrKeyword },
+                "matwrite" => new MatWriteToken { Text = idOrKeyword },
+                "oswrite" => new OsWriteToken { Text = idOrKeyword },
+                "osread" => new OsReadToken { Text = idOrKeyword },
+                "dimension" => new DimensionToken { Text = idOrKeyword },
+                "dim" => new DimensionToken { Text = idOrKeyword },
+                "output" => new OutputToken { Text = idOrKeyword },
+                "precomp" => new PreCompToken { Text = idOrKeyword },
+                "common" => new CommonToken { Text = idOrKeyword },
+                "freecommon" => new FreeCommonToken { Text = idOrKeyword },
+                "initrnd" => new InitRndToken { Text = idOrKeyword },
+                "by" => new ByToken { Text = idOrKeyword },
+                "select" => new SelectToken { Text = idOrKeyword },
+                "equate" => new EquToken { Text = idOrKeyword },
+                "garbagecollect" => new GarbageCollectToken { Text = idOrKeyword },
+                "flush" => new FlushToken { Text = idOrKeyword },
+                "readv" => new ReadVToken { Text = idOrKeyword },
+                "reado" => new ReadOToken { Text = idOrKeyword },
+                "matparse" => new MatParseToken { Text = idOrKeyword },
+                "into" => new IntoToken { Text = idOrKeyword },
+                "matches" => new MatchesToken { Text = idOrKeyword },
+                "initdir" => new InitDirToken { Text = idOrKeyword },
+                "writev" => new WriteVToken { Text = idOrKeyword },
+                "compile" => new CompileToken { Text = idOrKeyword },
+                "osopen" => new OsOpenToken { Text = idOrKeyword },
+                "osdelete" => new OsDeleteToken { Text = idOrKeyword },
+                "osclose" => new OsCloseToken { Text = idOrKeyword },
+                "osbread" => new OsBReadToken { Text = idOrKeyword },
+                "osbwrite" => new OsBWriteToken { Text = idOrKeyword },
+                "length" => new LengthToken { Text = idOrKeyword },
+                "bremove" => new BRemoveToken { Text = idOrKeyword },
+                "ge" => new GeToken { Text = idOrKeyword },
+                "ne" => new NeToken { Text = idOrKeyword },
+                "lt" => new LtToken { Text = idOrKeyword },
+                "le" => new LeToken { Text = idOrKeyword },
+                "gt" => new GtToken { Text = idOrKeyword },
+                "eq" => new EqToken { Text = idOrKeyword },
+                "_eqc" => new EqcToken { Text = idOrKeyword },
+                "_nec" => new NecToken { Text = idOrKeyword },
+                "_ltc" => new LtcToken { Text = idOrKeyword },
+                "_lec" => new LecToken { Text = idOrKeyword },
+                "_gtc" => new GtcToken { Text = idOrKeyword },
+                "_gec" => new GecToken { Text = idOrKeyword },
+                "_eqx" => new EqxToken { Text = idOrKeyword },
+                "_nex" => new NextToken { Text = idOrKeyword },
+                "_ltx" => new LtxToken { Text = idOrKeyword },
+                "_gtx" => new GtxToken { Text = idOrKeyword },
+                "_lex" => new LexToken { Text = idOrKeyword },
+                "_gex" => new GexToken { Text = idOrKeyword },
+                "and" => new AndToken { Text = idOrKeyword },
+                "or" => new OrToken { Text = idOrKeyword },
+                _ => new IdentifierToken { Text = idOrKeyword },
+            };
+        }
+
+        NumberToken ScanNumber()
+        {
+            int start = _pos - 1;
+            bool hexAllowed = (Match("x") || _source[start] == '\\');
+            bool dotAllowed = _source[start] != '.';
+
+
+            while (!IsAtEnd())
+            {
+                char chr = Peek();
+                if (chr == '.')
+                {
+                    if (dotAllowed)
+                    {
+                        dotAllowed = false;
+                    } else
+                    {
+                        Error.ReportError(_lineNo, "Number contains invalid decimal point.");
+                        return null;
+                    }
                 } else
                 {
-                    throw new InvalidOperationException($"Failed to match token at pos {_pos}, line {GetLineNo()}.");
+                    if (!IsNumber(chr))
+                    {
+                        break;
+                    }
                 }
-             
+
+                Advance();
             }
-            _tokens.Add(new EofToken { LineNo = GetLineNo(), Pos = _pos });
-            return _tokens;
+
+            
+
+
+            if (_source[start] == '\\' && !Match('\\'))
+            {
+                Error.ReportError(_lineNo,"Number must end in \\");
+                return null;
+            }
+
+            string number = _source[start.._pos];
+
+            if (number == ".")
+            {
+                Error.ReportError(_lineNo, "Invalid dot.");
+                return null;
+            }
+
+            return new NumberToken { Text = number };
         }
     }
 }
