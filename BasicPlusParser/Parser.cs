@@ -861,15 +861,11 @@ namespace BasicPlusParser
                 {
                     if (statements.Count >= 1) ExpectStatementSeparator();
 
-                    if (stop(statements))
-                    {
-                        break;
-                    }
-
+                    if (stop(statements)) break;
+      
                     int lineNo = GetLineNo();
                     statements.Add(ParseStmt(inLoop: inLoop));
                     AnnotateStmt(statements, lineNo);
-
                 } catch 
                 {
                     while (!stop(statements) && PeekNextToken() is not NewLineToken && PeekNextToken() is not SemiColonToken)
@@ -1527,14 +1523,13 @@ namespace BasicPlusParser
 
             int tokenIndex = _nextTokenIndex;
             Expression expr = null;
-            
             try
             {
                 expr = ParseLogExpr(takeGt: takeGt);
             }
             catch
             {
-                if (tokenIndex + 1== _nextTokenIndex  && optional)
+                if (tokenIndex + 1 == _nextTokenIndex  && optional)
                 {
                     _nextTokenIndex = tokenIndex;
                     return null;
@@ -1691,7 +1686,6 @@ namespace BasicPlusParser
 
         }
 
-
         Expression ParseMulExpr()
         {
             Expression expr = ParsePowerExpr();
@@ -1745,8 +1739,6 @@ namespace BasicPlusParser
             return new IfExpression { Then = thenBlock, Condition = cond, Else = elseBlock };
         }
 
-
-
         Expression ParseAngleArray(Token token, Expression baseExpr)
         {
 
@@ -1755,7 +1747,6 @@ namespace BasicPlusParser
                 _nextTokenIndex -= 1;
                 return null;
             }
-
 
             int tokenPos = _nextTokenIndex - 1;
             List<Expression> indexes = new List<Expression>();
@@ -1778,7 +1769,6 @@ namespace BasicPlusParser
                 return null;
             }
         }
-
 
         Expression ParseSqrBracketArray(Token token, Expression expr)
         {
@@ -1864,15 +1854,14 @@ namespace BasicPlusParser
             }
             else
             {
-                throw new InvalidOperationException("Expected identifier, number, function, or parenthesized expression.");
+                throw Error(GetLineNo(),"Expression expected.");
             }
 
             while (NextTokenIs(out Token optoken, typeof(LAngleBracketToken), typeof(LSqrBracketToken)))
             {
-                Expression arrayExpr = null;
                 if (optoken is LAngleBracketToken)
                 {
-                    arrayExpr = ParseAngleArray(token, expr);
+                    Expression arrayExpr = ParseAngleArray(token, expr);
                     if (arrayExpr == null)
                     {
                         // Not an array so break out.
@@ -1906,31 +1895,8 @@ namespace BasicPlusParser
             {
                 return _tokens[_nextTokenIndex++];
             }
-            throw new InvalidOperationException("Unexpected end of program.");
+            throw Error(GetLineNo(),"Unexpected end of program.");
         }
-
-
-        Token ExpectToken(Type expectedToken)
-        {
-            Token token = PeekNextToken();
-            if (token.GetType() != expectedToken)
-            {
-                throw new InvalidOperationException($"Expected {expectedToken}");    
-            }
-            return _tokens[_nextTokenIndex++];
-        }
-
-        Token ExpectToken(params Type[] validTokens)
-        {
-            Token token = PeekNextToken();
-            if(!validTokens.Any(x=>x == token.GetType()))
-            {
-                throw new InvalidOperationException($"Expected {validTokens}");
-
-            }
-            return _tokens[_nextTokenIndex++];
-        }
-
 
         bool NextTokenIs(out Token token, params Type[] validTokens)
         {
@@ -1946,7 +1912,6 @@ namespace BasicPlusParser
                 return false;
             }
         }
-
 
         Token ConsumeToken(string errMsg = null, bool optional = false, params Type[] expected)
         {
@@ -2023,8 +1988,7 @@ namespace BasicPlusParser
                 return;
             }
 
-
-            throw new InvalidOperationException("Statement not terminated properly");
+            throw Error(GetLineNo(), "Semicolon or newline expected");
         }
 
         bool IsAtEnd()
