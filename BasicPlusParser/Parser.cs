@@ -19,11 +19,6 @@ namespace BasicPlusParser
         HashSet<string> _matricies = new();
         ParseErrors _parseErrors = new();
 
-        bool IsMatrix(Token token)
-        {
-            return _matricies.Contains(token.Text.ToLower());
-        }
-         
         public Parser(string text)
         {
             Tokenizer tokenizer = new(text, _parseErrors);
@@ -68,6 +63,352 @@ namespace BasicPlusParser
             }
             ConsumeToken(typeof(NewLineToken));
             return new OiProgram(programType, progName.Text, args);
+        }
+
+        public List<Statement> ParseStmts(Func<bool> stop, bool inLoop = false)
+        {
+            return ParseStmts(_ => stop(), inLoop: inLoop);
+        }
+
+        public List<Statement> ParseStmts(Func<List<Statement>, bool> stop, bool inLoop = false)
+        {
+            List<Statement> statements = new();
+            while (!stop(statements))
+            {
+                try
+                {
+                    if (statements.Count >= 1) ConsumeStatementSeparator();
+
+                    if (stop(statements)) break;
+
+                    int lineNo = GetLineNo();
+                    statements.Add(ParseStmt(inLoop: inLoop));
+                    AnnotateStmt(statements, lineNo);
+                }
+                catch
+                {
+                    Sync(stop, statements);
+                }
+            }
+            return statements;
+        }
+
+        public Statement ParseStmt(bool inLoop = false)
+        {
+            Token token = GetNextToken();
+            if (token is IdentifierToken)
+            {
+                if (NextTokenIs(typeof(EqualToken)))
+                {
+                    return ParseAssignmentStmt(token);
+
+                }
+                else if (NextTokenIs(typeof(LAngleBracketToken)))
+                {
+
+                    return ParseAngleAssignmentStmt(token);
+                }
+                else if (token.DisallowFunction == false && NextTokenIs(typeof(LSqrBracketToken)))
+                {
+                    return ParseSquareBracketArrayAssignmentStmt(token);
+                }
+                else if (NextTokenIs(typeof(ColonToken)))
+                {
+                    return ParseInternalSubStmt(token);
+                }
+                else if (NextTokenIs(typeof(PlusEqualToken)))
+                {
+                    return ParsePlusAssignmentStmt(token);
+                }
+                else if (NextTokenIs(typeof(MinusEqualToken)))
+                {
+                    return ParseMinusAssignmentStmt(token);
+                }
+                else if (NextTokenIs(typeof(SlashEqualToken)))
+                {
+                    return ParseDivideAssignmentStmt(token);
+                }
+                else if (NextTokenIs(typeof(StarEqualToken)))
+                {
+                    return ParseMulAssignmentStmt(token);
+                }
+                else if (NextTokenIs(typeof(ColonEqualToken)))
+                {
+                    return ParseConcatAssignmentStmt(token);
+                }
+                else if (!token.DisallowFunction && !IsMatrix(token) && NextTokenIs(typeof(LParenToken)))
+                {
+                    return ParseFunctionCallStmt(token);
+                }
+                else if (IsMatrix(token) && NextTokenIs(typeof(LParenToken)))
+                {
+                    return ParseMatrixAssignmentStmt(token);
+                }
+                else if (token is IfToken)
+                {
+                    return ParseIfStmt();
+                }
+                else if (token is BeginToken)
+                {
+                    return ParseCaseStmt();
+                }
+                else if (token is ReturnToken)
+                {
+                    return ParseReturnStmt();
+                }
+                else if (token is ForToken)
+                {
+                    return ParseForLoopStmt();
+                }
+                else if (token is LoopToken)
+                {
+                    return ParseLoopRepeatStmt();
+                }
+                else if (token is GosubToken)
+                {
+                    return ParseGosubStmt();
+                }
+                else if (inLoop == true && token is WhileToken)
+                {
+                    return ParseWhileStmt();
+                }
+                else if (inLoop == true && token is UntilToken)
+                {
+                    return ParseUntilStmt();
+                }
+                else if (token is EquToken)
+                {
+                    return ParseEquStatement(token);
+                }
+                else if (token is InsertToken)
+                {
+                    return ParseInsertStmt();
+                }
+                else if (token is DeclareToken)
+                {
+                    return ParseDeclareStmt();
+                }
+                else if (token is CallToken)
+                {
+                    return ParseCallStmt();
+                }
+                else if (token is RemoveToken)
+                {
+                    return ParseRemoveStmt();
+                }
+                else if (token is MatToken)
+                {
+                    return ParseMatStmt();
+                }
+                else if (token is SwapToken)
+                {
+                    return ParseSwapStmt();
+                }
+                else if (token is LocateToken)
+                {
+                    return ParseLocateStmt();
+                }
+                else if (token is NullToken)
+                {
+                    return ParseNullStmt();
+                }
+                else if (token is ConvertToken)
+                {
+                    return ParseConvertStmt();
+                }
+                else if (token is DebugToken)
+                {
+                    return ParseDebugStmt();
+                }
+                else if (token is OpenToken)
+                {
+                    return ParseOpenStmt();
+                }
+                else if (token is ReadToken)
+                {
+                    return ParseReadStmt();
+                }
+                else if (token is WriteToken)
+                {
+                    return ParseWriteStmt();
+                }
+                else if (token is DeleteToken)
+                {
+                    return ParseDeleteSmt();
+                }
+                else if (token is LockToken)
+                {
+                    return ParseLockStmt();
+                }
+                else if (token is UnlockToken)
+                {
+                    return ParseUnlockStmt();
+                }
+                else if (token is ClearSelectToken)
+                {
+                    return ParseClearSelectStmt();
+                }
+                else if (token is ReadNextToken)
+                {
+                    return ParseReadNextStmt();
+                }
+                else if (token is GoToToken)
+                {
+                    return ParseGoToStmt();
+                }
+                else if (token is TransferToken)
+                {
+                    return ParseTransferStmt();
+                }
+                else if (token is MatReadToken)
+                {
+                    return ParseMatReadStmt();
+                }
+                else if (token is MatWriteToken)
+                {
+                    return ParseMatWriteStmt();
+                }
+                else if (token is OsWriteToken)
+                {
+                    return ParseOsWriteStmt();
+                }
+                else if (token is OsReadToken)
+                {
+                    return ParseOsReadStmt();
+                }
+                else if (token is DimensionToken)
+                {
+                    return ParseDimStmt(token);
+                }
+                else if (token is CommonToken)
+                {
+                    return ParseCommonStmt();
+                }
+                else if (token is FreeCommonToken)
+                {
+                    return ParseFreeCommonStmt();
+                }
+                else if (token is InitRndToken)
+                {
+                    return ParseInitRndStmt();
+                }
+                else if (token is SelectToken)
+                {
+                    return ParseSelectStmt();
+                }
+                else if (token is FlushToken)
+                {
+                    return ParseFlushStmt();
+                }
+                else if (token is GarbageCollectToken)
+                {
+                    return ParseGarbageCollectStmt();
+                }
+                else if (token is ReadVToken)
+                {
+                    return ParseReadVStmt();
+                }
+                else if (token is ReadOToken)
+                {
+                    return ParseReadOStmt();
+                }
+                else if (token is MatParseToken)
+                {
+                    return ParseMatParseStmt();
+                }
+                else if (token is InitDirToken)
+                {
+                    return ParseInitDirStmt();
+                }
+                else if (token is WriteVToken)
+                {
+                    return ParseWriteVStmt();
+                }
+                else if (token is OnToken)
+                {
+                    return ParseJumpStmt();
+                }
+                else if (token is OsOpenToken)
+                {
+                    return ParseOsOpenStmt();
+                }
+                else if (token is OsDeleteToken)
+                {
+                    return ParseOsDeleteStmt();
+                }
+                else if (token is OsCloseToken)
+                {
+                    return ParseOsCloseStmt();
+                }
+                else if (token is OsBWriteToken)
+                {
+                    return ParseOsBWriteStmt();
+                }
+                else if (token is OsBReadToken)
+                {
+                    return ParseOsBReadStmt();
+                }
+                else if (token is BRemoveToken)
+                {
+                    return ParseBRemoveStmt();
+                }
+            }
+            else if (token is PragmaToken)
+            {
+                return ParsePragmaStmt();
+            }
+            else if (token is EndToken)
+            {
+                return ParseEndStmt();
+            }
+            else if (token is SemiColonToken)
+            {
+                return new EmptyStatement();
+            }
+            throw Error(GetLineNo(), $"Unmatched token {token}.");
+        }
+
+        void ConsumeStatementSeparator()
+        {
+            if (PeekNextToken() is EofToken)
+            {
+                return;
+            }
+
+            if (NextTokenIs(typeof(NewLineToken)))
+            {
+                return;
+            }
+
+            if (NextTokenIs(typeof(SemiColonToken)))
+            {
+                ConsumeToken(typeof(NewLineToken), optional:true);
+                return;
+            }
+
+            throw Error(GetLineNo(), "Semicolon or newline expected.");
+        }
+
+        void AnnotateStmt(List<Statement> statements, int lineNo)
+        {
+            Statement statement = statements.Last();
+            statement.LineNo = lineNo;
+            switch (statement)
+            {
+                case
+                    InternalSubStatement s:
+                    _labels.Add(s.Label.Name, (statements, statements.Count));
+                    break;
+            }
+        }
+
+        void Sync(Func<List<Statement>, bool> stop, List<Statement> statements)
+        {
+            // When an error occurs, lets start parsing again after the next new line or semicolon.
+            while (!stop(statements) && PeekNextToken() is not NewLineToken && PeekNextToken() is not SemiColonToken && PeekNextToken() is not EofToken)
+            {
+                _nextTokenIndex += 1;
+            }
         }
 
         Statement ParseUnlockStmt()
@@ -274,8 +615,6 @@ namespace BasicPlusParser
             };
         }
 
-
-
         Statement ParseReadStmt()
         {
             Token var = ConsumeIdToken();
@@ -478,7 +817,7 @@ namespace BasicPlusParser
             };
         }
 
-        public Case ParseCase()
+        Case ParseCase()
         {
             Expression cond = ParseExpr();
             ConsumeToken(typeof(NewLineToken));
@@ -491,7 +830,7 @@ namespace BasicPlusParser
             };
         }
 
-        public Statement ParseCaseStmt()
+        Statement ParseCaseStmt()
         {
             ConsumeToken(typeof(CaseToken));
             ConsumeToken(typeof(NewLineToken));
@@ -508,7 +847,7 @@ namespace BasicPlusParser
             };
         }
 
-        public Statement ParseAngleAssignmentStmt(Token token)
+        Statement ParseAngleAssignmentStmt(Token token)
         {
             List<Expression> indexes = new();
             do
@@ -558,7 +897,6 @@ namespace BasicPlusParser
                 Value = val
             };
         }
-
 
         Statement ParseFunctionCallStmt(Token token)
         {
@@ -707,7 +1045,6 @@ namespace BasicPlusParser
             };
         }
 
-
         public Statement ParseSwapStmt()
         {
             Expression oldVal = ParseExpr();
@@ -725,6 +1062,17 @@ namespace BasicPlusParser
 
         Statement ParseInternalSubStmt(Token token)
         {
+            // At first I tried to store all statements that were part of this "interanl subroutine" in a list
+            // referenced by this statement, but that cannot work, as an internal subroutine can span multiple "blocks",
+            // as the below code demonstrates.
+            /*
+                for i = 1 to 3
+                    in_loop = 1
+                    v:
+                       next i
+                       end_of_loop = 1
+            */
+
             //ExpectStatementEnd();
             //List<Statement> statements = ParseStmts(x => x.Count > 0 &&  x.Last() is ReturnStatement 
            //     || PeekNextToken() is EofToken);   
@@ -836,52 +1184,6 @@ namespace BasicPlusParser
             };
         }
 
-        void AnnotateStmt(List<Statement> statements, int lineNo)
-        {
-            Statement statement = statements.Last();
-            statement.LineNo = lineNo;
-            switch (statement) {
-                case 
-                    InternalSubStatement s: _labels.Add(s.Label.Name, (statements, statements.Count));
-                    break;
-            } 
-        }
-
-        public List<Statement> ParseStmts(Func<bool> stop, bool inLoop = false)
-        {
-            return ParseStmts(_ => stop(), inLoop: inLoop);
-        }
-
-        public List<Statement> ParseStmts( Func<List<Statement>, bool> stop, bool inLoop = false)
-        {
-            List<Statement> statements = new();
-            while (!stop(statements))
-            {
-                try
-                {
-                    if (statements.Count >= 1) ExpectStatementSeparator();
-
-                    if (stop(statements)) break;
-      
-                    int lineNo = GetLineNo();
-                    statements.Add(ParseStmt(inLoop: inLoop));
-                    AnnotateStmt(statements, lineNo);
-                } catch 
-                {
-                    Sync(stop, statements);
-                }   
-            }
-            return statements;
-        }
-
-        void Sync(Func<List<Statement>, bool> stop, List<Statement> statements)
-        {
-            while (!stop(statements) && PeekNextToken() is not NewLineToken && PeekNextToken() is not SemiColonToken && PeekNextToken() is not EofToken)
-            {
-                _nextTokenIndex += 1;
-            }
-        }
-
         Statement ParseTransferStmt()
         {
             Token from = ConsumeIdToken();
@@ -893,7 +1195,6 @@ namespace BasicPlusParser
                 To = new IdExpression(to.Text, IdentifierType.Reference)
             };
         }
-
 
         Statement ParseOsReadStmt()
         {
@@ -1222,278 +1523,6 @@ namespace BasicPlusParser
             };
         }
 
-        public Statement ParseStmt(bool inLoop = false)
-        {
-            Token token = GetNextToken();
-            if (token is IdentifierToken)
-            {
-                if (NextTokenIs(typeof(EqualToken)))
-                {
-                    return ParseAssignmentStmt(token);
-
-                } else if (NextTokenIs(typeof(LAngleBracketToken))) {
-
-                    return ParseAngleAssignmentStmt(token);
-                }
-                else if ( token.DisallowFunction == false && NextTokenIs(typeof(LSqrBracketToken)))
-                {
-                    return ParseSquareBracketArrayAssignmentStmt(token);
-                }
-                else if (NextTokenIs(typeof(ColonToken)))
-                {
-                    return ParseInternalSubStmt(token);
-                }
-                else if (NextTokenIs(typeof(PlusEqualToken)))
-                {
-                    return ParsePlusAssignmentStmt(token);
-                }
-                else if (NextTokenIs(typeof(MinusEqualToken)))
-                {
-                    return ParseMinusAssignmentStmt(token);
-                }
-                else if (NextTokenIs(typeof(SlashEqualToken)))
-                {
-                    return ParseDivideAssignmentStmt(token);
-                }
-                else if (NextTokenIs(typeof(StarEqualToken)))
-                {
-                    return ParseMulAssignmentStmt(token);
-                }
-                else if (NextTokenIs(typeof(ColonEqualToken)))
-                {
-                    return ParseConcatAssignmentStmt(token);
-                }
-                else if (!token.DisallowFunction && !IsMatrix(token) && NextTokenIs(typeof(LParenToken)))
-                {
-                    return ParseFunctionCallStmt(token);
-                }
-                else if (IsMatrix(token) && NextTokenIs(typeof(LParenToken)))
-                {
-                    return ParseMatrixAssignmentStmt(token);
-                }
-                else if (token is IfToken)
-                {
-                    return ParseIfStmt();
-                }
-                else if (token is BeginToken)
-                {
-                    return ParseCaseStmt();
-                }
-                else if (token is ReturnToken)
-                {
-                    return ParseReturnStmt();
-                }
-                else if (token is ForToken)
-                {
-                    return ParseForLoopStmt();
-                }
-                else if (token is LoopToken)
-                {
-                    return ParseLoopRepeatStmt();
-                }
-                else if (token is GosubToken)
-                {
-                    return ParseGosubStmt();
-                }
-                else if (inLoop == true && token is WhileToken)
-                {
-                    return ParseWhileStmt();
-                }
-                else if (inLoop == true && token is UntilToken)
-                {
-                    return ParseUntilStmt();
-                }
-                else if (token is EquToken)
-                {
-                    return ParseEquStatement(token);
-                }
-                else if (token is InsertToken)
-                {
-                    return ParseInsertStmt();
-                }
-                else if (token is DeclareToken)
-                {
-                    return ParseDeclareStmt();
-                }
-                else if (token is CallToken)
-                {
-                    return ParseCallStmt();
-                }
-                else if (token is RemoveToken)
-                {
-                    return ParseRemoveStmt();
-                }
-                else if (token is MatToken)
-                {
-                    return ParseMatStmt();
-                }
-                else if (token is SwapToken)
-                {
-                    return ParseSwapStmt();
-                }
-                else if (token is LocateToken)
-                {
-                    return ParseLocateStmt();
-                }
-                else if (token is NullToken)
-                {
-                    return ParseNullStmt();
-                }
-                else if (token is ConvertToken)
-                {
-                    return ParseConvertStmt();
-                }
-                else if (token is DebugToken)
-                {
-                    return ParseDebugStmt();
-                }
-                else if (token is OpenToken)
-                {
-                    return ParseOpenStmt();
-                }
-                else if (token is ReadToken)
-                {
-                    return ParseReadStmt();
-                }
-                else if (token is WriteToken)
-                {
-                    return ParseWriteStmt();
-                }
-                else if (token is DeleteToken)
-                {
-                    return ParseDeleteSmt();
-                }
-                else if (token is LockToken)
-                {
-                    return ParseLockStmt();
-                }
-                else if (token is UnlockToken)
-                {
-                    return ParseUnlockStmt();
-                }
-                else if (token is ClearSelectToken)
-                {
-                    return ParseClearSelectStmt();
-                }
-                else if (token is ReadNextToken)
-                {
-                    return ParseReadNextStmt();
-                } 
-                else if (token is GoToToken)
-                {
-                    return ParseGoToStmt();
-                }
-                else if (token is TransferToken)
-                {
-                    return ParseTransferStmt();
-                }
-                else if (token is MatReadToken)
-                {
-                    return ParseMatReadStmt();
-                }
-                else if (token is MatWriteToken)
-                {
-                    return ParseMatWriteStmt();
-                }
-                else if (token is OsWriteToken)
-                {
-                    return ParseOsWriteStmt();
-                }
-                else if (token is OsReadToken)
-                {
-                    return ParseOsReadStmt();
-                }
-                else if (token is DimensionToken)
-                {
-                    return ParseDimStmt(token);
-                }
-                else if (token is CommonToken)
-                {
-                    return ParseCommonStmt();
-                }
-                else if (token is FreeCommonToken)
-                {
-                    return ParseFreeCommonStmt();
-                }
-                else if (token is InitRndToken)
-                {
-                    return ParseInitRndStmt();
-                }
-                else if (token is SelectToken)
-                {
-                    return ParseSelectStmt();
-                }
-                else if (token is FlushToken)
-                {
-                    return ParseFlushStmt();
-                }
-                else if (token is GarbageCollectToken)
-                {
-                    return ParseGarbageCollectStmt();
-                }
-                else if (token is ReadVToken)
-                {
-                    return ParseReadVStmt();
-                }
-                else if (token is ReadOToken)
-                {
-                    return ParseReadOStmt();
-                }
-                else if (token is MatParseToken)
-                {
-                    return ParseMatParseStmt();
-                }
-                else if (token is InitDirToken)
-                {
-                    return ParseInitDirStmt();
-                }
-                else if (token is WriteVToken)
-                {
-                    return ParseWriteVStmt();
-                }
-                else if (token is OnToken)
-                {
-                    return ParseJumpStmt();
-                }
-                else if (token is OsOpenToken)
-                {
-                    return ParseOsOpenStmt();
-                }
-                else if (token is OsDeleteToken)
-                {
-                    return ParseOsDeleteStmt();
-                }
-                else if (token is OsCloseToken)
-                {
-                    return ParseOsCloseStmt();
-                }
-                else if (token is OsBWriteToken)
-                {
-                    return ParseOsBWriteStmt();
-                }
-                else if (token is OsBReadToken)
-                {
-                    return ParseOsBReadStmt();
-                }
-                else if (token is BRemoveToken)
-                {
-                    return ParseBRemoveStmt();
-                }
-            } else if (token is PragmaToken)
-            {
-                return ParsePragmaStmt();
-            } 
-            else if (token is EndToken)
-            {
-                return ParseEndStmt();
-            }
-            else if (token is SemiColonToken)
-            {
-                return new EmptyStatement();
-            }
-            throw Error(GetLineNo(), $"Unmatched token {token}.");
-        }
-
         Statement ParseOsDeleteStmt()
         {
             Expression filePath = ParseExpr();
@@ -1566,7 +1595,6 @@ namespace BasicPlusParser
             }
             return expr;
         }
-
 
         Expression ParseLogExpr(bool inArray = false)
         {
@@ -1650,7 +1678,6 @@ namespace BasicPlusParser
             return expr;
         }
 
-
         Expression ParseAddExpr()
         {
             Expression expr = ParseMulExpr();
@@ -1688,8 +1715,6 @@ namespace BasicPlusParser
             } while (NextTokenIs(typeof(CommaToken)));
             ConsumeToken(typeof(RSqrBracketToken));
             return new ArrayInitExpression{ Sequence = indexes };
-
-
         }
 
         Expression ParseMulExpr()
@@ -1977,27 +2002,6 @@ namespace BasicPlusParser
             return NextTokenIs(out Token token, validTokens);
         }
 
-        void ExpectStatementSeparator()
-        {
-            if (PeekNextToken() is EofToken)
-            {
-                return;
-            }
-
-            if (NextTokenIs(typeof(NewLineToken)))
-            {
-                return;
-            }
-
-            if (NextTokenIs(typeof(SemiColonToken)))
-            {
-                NextTokenIs(typeof(NewLineToken));
-                return;
-            }
-
-            throw Error(GetLineNo(), "Semicolon or newline expected");
-        }
-
         bool IsAtEnd()
         {
             return PeekNextToken() is EofToken;
@@ -2017,6 +2021,11 @@ namespace BasicPlusParser
         int GetLineNo()
         {
             return PeekNextToken()?.LineNo ?? _tokens.Last().LineNo;
+        }
+
+        bool IsMatrix(Token token)
+        {
+            return _matricies.Contains(token.Text.ToLower());
         }
     }
 }
