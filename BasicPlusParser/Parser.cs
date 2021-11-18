@@ -868,13 +868,18 @@ namespace BasicPlusParser
                     AnnotateStmt(statements, lineNo);
                 } catch 
                 {
-                    while (!stop(statements) && PeekNextToken() is not NewLineToken && PeekNextToken() is not SemiColonToken)
-                    {
-                        _nextTokenIndex += 1;
-                    }
+                    Sync(stop, statements);
                 }   
             }
             return statements;
+        }
+
+        void Sync(Func<List<Statement>, bool> stop, List<Statement> statements)
+        {
+            while (!stop(statements) && PeekNextToken() is not NewLineToken && PeekNextToken() is not SemiColonToken && PeekNextToken() is not EofToken)
+            {
+                _nextTokenIndex += 1;
+            }
         }
 
         Statement ParseTransferStmt()
@@ -1887,7 +1892,8 @@ namespace BasicPlusParser
             {
                 return _tokens[_nextTokenIndex + lookAhead];
             }
-            return null;
+
+            return _tokens.Last();
         }
 
         Token GetNextToken()
