@@ -513,7 +513,7 @@ namespace BasicPlusParser
             List<Expression> indexes = new();
             do
             {
-                indexes.Add(ParseExpr(takeGt: true));
+                indexes.Add(ParseExpr(inArray: true));
             }
             while (indexes.Count < 4 && NextTokenIs(typeof(CommaToken)));
             ConsumeToken(typeof(RAngleBracketToken));
@@ -1514,7 +1514,7 @@ namespace BasicPlusParser
             };
         }
 
-        Expression ParseExpr(bool takeGt = false, bool optional = false)
+        Expression ParseExpr(bool inArray = false, bool optional = false)
         {
             if (IsStatementEnd() && optional)
             {
@@ -1525,7 +1525,7 @@ namespace BasicPlusParser
             Expression expr = null;
             try
             {
-                expr = ParseLogExpr(takeGt: takeGt);
+                expr = ParseLogExpr(inArray: inArray);
             }
             catch
             {
@@ -1543,7 +1543,7 @@ namespace BasicPlusParser
             Token optoken;
             while (NextTokenIs(out optoken, typeof(AndToken), typeof(OrToken), typeof(MatchesToken)))
             {
-                Expression right = this.ParseLogExpr(takeGt: takeGt);
+                Expression right = this.ParseLogExpr(inArray: inArray);
 
 
                 if (optoken is OrToken)
@@ -1563,7 +1563,7 @@ namespace BasicPlusParser
         }
 
 
-        Expression ParseLogExpr(bool takeGt = false)
+        Expression ParseLogExpr(bool inArray = false)
         {
             Expression expr = ParseConcatExpr();
             Token optoken;
@@ -1573,8 +1573,9 @@ namespace BasicPlusParser
                 typeof(LtcToken),typeof(LecToken),typeof(GtcToken),typeof(GecToken),typeof(EqxToken),
                 typeof(NexToken),typeof(LtxToken),typeof(GtxToken),typeof(LexToken),typeof(GexToken)))
             {
-                if (optoken is RAngleBracketToken && takeGt)
+                if (optoken is RAngleBracketToken && inArray)
                 {
+                    // Since we are in an array, take the right angle bracket as the delimiter of the array.
                     _nextTokenIndex -= 1;
                     return expr;
                 }
@@ -1752,7 +1753,7 @@ namespace BasicPlusParser
             List<Expression> indexes = new List<Expression>();
             do
             {
-                indexes.Add(ParseExpr(takeGt: true));
+                indexes.Add(ParseExpr(inArray: true));
 
             } while (indexes.Count < 4 && NextTokenIs(typeof(CommaToken)));
 
