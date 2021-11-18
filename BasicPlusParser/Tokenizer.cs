@@ -8,10 +8,10 @@ namespace BasicPlusParser
     public class Tokenizer
     {
         int _pos = 0;
-        List<Token> _tokens = new();
-        string _source;
+        readonly List<Token> _tokens = new();
+        readonly string _source;
         Token _prevToken => _tokens.Count > 0 ? _tokens.Last() : null;
-        public ParseErrors Error;
+        readonly ParseErrors _tokenErrors;
         int _col;
         int _lineNo = 1;
 
@@ -20,7 +20,7 @@ namespace BasicPlusParser
             return _pos >= _source.Length;
         }
 
-         bool Match(char expected)
+        bool Match(char expected)
         {
             if (IsAtEnd()) return false;
             if (_source[_pos] != expected) return false;
@@ -36,35 +36,33 @@ namespace BasicPlusParser
         bool Match(string expected)
         {
             if (IsAtEnd()) return false;
-            if (_source.Substring(_pos).StartsWith(expected, StringComparison.OrdinalIgnoreCase)){
+            if (_source.Substring(_pos).StartsWith(expected, StringComparison.OrdinalIgnoreCase)) {
                 _pos += expected.Length;
                 return true;
             }
             return false;
-            
+
         }
 
         char Peek()
         {
-            if ( _pos  >= _source.Length ) return '\0';
+            if (_pos >= _source.Length) return '\0';
             return _source[_pos];
         }
 
         public Tokenizer(string text, ParseErrors error)
         {
-            Error = error;
+            _tokenErrors = error;
             _source = text;
         }
 
-
-
         public List<Token> Tokenise()
         {
-            while (_pos < _source.Length)
+            while (!IsAtEnd())
             {
                 int start = _pos;
                 int startLineNo = _lineNo;
-                Token matchedToken = GetNextToken();
+                Token matchedToken = GetNextToken(start);
                 if (matchedToken != null)
                 {
                     matchedToken.LineNo = startLineNo;
@@ -88,23 +86,18 @@ namespace BasicPlusParser
                     }
                     _tokens.Add(matchedToken);
                 }
-                else
-                {
-                    Error.ReportError(_lineNo, $"Unexpected character: {_source[_pos]}");
-                }
-
             }
             _tokens.Add(new EofToken { LineNo = _lineNo, Pos = _pos });
             return _tokens;
         }
 
-        public Token GetNextToken()
+        public Token GetNextToken(int start)
         {
             char character = Advance();
             switch (character)
             {
                 case '=':
-                    return new EqualToken { Text = "=" };
+                    return new EqualToken { Text = character.ToString() };
                 case '"':
                     return ScanStringLiteral('"');
                 case '\'':
@@ -118,18 +111,18 @@ namespace BasicPlusParser
                 case '+':
                     if (Match("++")) return new MultiValueAddToken { Text = "+++" };
                     else if (Match('=')) return new PlusEqualToken { Text = "+=" };
-                    else return new PlusToken { Text = "+" };
+                    else return new PlusToken { Text = character.ToString() };
                 case '-':
                     if (Match("--")) return new MultiValueSubToken { Text = "---" };
                     else if (Match("=")) return new MinusEqualToken { Text = "-=" };
-                    else return new MinusToken { Text = "-" };
+                    else return new MinusToken { Text = character.ToString() };
                 case '/':
                     if (Match("//")) return new MultiValueDivToken { Text = "///" };
                     else if (Match("=")) return new SlashEqualToken { Text = "/=" };
                     else if (Match("/") && StartOfStmt()) return ScanSingleLineComment();
                     else if (Match("*")) return ScanMultiLineComment();
                     else if (_prevToken is CommonToken) return ScanCommonNameToken();
-                    else return new SlashToken { Text = "/" };
+                    else return new SlashToken { Text = character.ToString() };
                 case '*':
                     if (StartOfStmt()) return ScanSingleLineComment();
                     else if (Match("=")) return new StarEqualToken { Text = "*=" };
@@ -175,11 +168,11 @@ namespace BasicPlusParser
                     {
                         _lineNo++;
                     }
-                    return new NewLineToken { Text = "\r\n" };
+                    return new NewLineToken { Text = _source[start.._pos] };
                 case ' ':
                 case '\t':
                     while (Match(' ') || Match('\t')) ;
-                    return new WhiteSpaceToken { Text = "" };
+                    return new WhiteSpaceToken { Text = _source[start.._pos] };
                 default:
                     if (IsIdentifierOrKeyWord(character))
                     {
@@ -191,16 +184,17 @@ namespace BasicPlusParser
                     }
                     else
                     {
+                        _tokenErrors.ReportError(_lineNo, $"Unmatched character: {_source[_pos]}");
                         return null;
                     }
             }
         }
-    
+
         bool IsIdentifierOrKeyWord(char chr)
         {
             return (chr >= 'a' && chr <= 'z') ||
                     (chr >= 'A' && chr <= 'Z') ||
-                        chr =='_' || chr == '@';
+                    chr == '_' || chr == '@';
         }
 
         bool IsNumber(char chr, bool hexAllowed = false)
@@ -209,37 +203,44 @@ namespace BasicPlusParser
                 (hexAllowed && (chr >= 'a' && chr <= 'f') || (chr >= 'A' && chr <= 'F'));
         }
 
-
         CommonNameToken ScanCommonNameToken()
         {
-            CommonNameToken token = new CommonNameToken();
-            while( Match('/'));
+            CommonNameToken token = new();
+            string terminator = "/";
+            if (Match('/'))
+            {
+                terminator += "/";
+            }
 
             int start = _pos;
-            while (Peek() != '/' && !IsAtEnd()) 
+            while (Peek() != '/' && !IsAtEnd())
             {
                 char chr = Advance();
 
                 if (chr == '\r')
                 {
-                    _pos -= 1;
-                    Error.ReportError(_lineNo, "New line is not allowed in common block.");
+                    _pos += 1;
+                    _tokenErrors.ReportError(_lineNo, "New line is not allowed in common block.");
                     return null;
                 }
-
             }
 
             if (IsAtEnd())
             {
-                Error.ReportError(_lineNo,"A common block must end with /");
+                _tokenErrors.ReportError(_lineNo, $"A common block must end with {terminator}");
                 return null;
             }
 
-            while (Match('/')) ;
-            token.Text = _source[start.._pos];
-            return token;    
-        }
 
+            if (!Match(terminator))
+            {
+                _tokenErrors.ReportError(_lineNo, $"A common block must end with {terminator}");
+                return null;
+            }
+
+            token.Text = _source[start.._pos];
+            return token;
+        }
 
         bool StartOfStmt()
         {
@@ -253,35 +254,32 @@ namespace BasicPlusParser
             {
                 char chr = Advance();
             }
-            return new CommentToken { Text = _source[start.._pos]};
-
-    
+            return new CommentToken { Text = _source[start.._pos] };
         }
-       
+
         CommentToken ScanMultiLineComment()
         {
             int start = _pos;
-            while(!IsAtEnd())
+            while (!IsAtEnd())
             {
                 char chr = Advance();
                 if (chr == '\r') _lineNo++;
-                if (chr == '*' && Match('/')){
-                    return new CommentToken { Text = _source[start..(_pos-2)]};
+                if (chr == '*' && Match('/')) {
+                    return new CommentToken { Text = _source[start..(_pos - 2)] };
                 }
             }
-            
 
-            Error.ReportError(_lineNo, "Multiline comment must be delimited with */");
+            _tokenErrors.ReportError(_lineNo, "Multiline comment must be delimited with */");
             return null;
         }
 
         StringToken ScanStringLiteral(char delim)
         {
             List<char> chars = new();
-            while (!Match(delim))
+            while (Peek() != delim && !IsAtEnd())
             {
                 char chr = Advance();
-               
+
                 if (chr == '\r')
                 {
                     if (chars.Count > 1 && chars.Last() == '|')
@@ -293,7 +291,7 @@ namespace BasicPlusParser
                     }
                     else
                     {
-                        Error.ReportError(_lineNo,$"String is not enclosed by {delim}");
+                        _tokenErrors.ReportError(_lineNo, $"String must be terminated by {delim}.");
                         return null;
                     }
                 }
@@ -302,17 +300,19 @@ namespace BasicPlusParser
 
             if (IsAtEnd())
             {
-                Error.ReportError(_lineNo, $"String is not enclosed by {delim}");
+                _tokenErrors.ReportError(_lineNo, $"String must be terminated by {delim}.");
                 return null;
             }
 
+            // Eat the quote.
+            Advance();
             return new StringToken { Text = new String(chars.ToArray()), Delim = delim };
         }
 
         Token ScanIdentifierOrKeyword()
         {
             int start = _pos - 1;
-            while (IsIdentifierOrKeyWord(Peek()) || IsNumber(Peek()) || Peek() == '.'  || Peek() == '$')
+            while (IsIdentifierOrKeyWord(Peek()) || IsNumber(Peek()) || Peek() == '.' || Peek() == '$')
             {
                 Advance();
             }
@@ -427,9 +427,8 @@ namespace BasicPlusParser
         NumberToken ScanNumber()
         {
             int start = _pos - 1;
-            bool hexAllowed = (Match("x") || _source[start] == '\\');
+            bool hexAllowed = (_source[start] == '0' && Match("x") || _source[start] == '\\');
             bool dotAllowed = _source[start] != '.';
-
 
             while (!IsAtEnd())
             {
@@ -441,12 +440,12 @@ namespace BasicPlusParser
                         dotAllowed = false;
                     } else
                     {
-                        Error.ReportError(_lineNo, "Number contains invalid decimal point.");
+                        _tokenErrors.ReportError(_lineNo, "Number contains more than 1 decimal point.");
                         return null;
                     }
                 } else
                 {
-                    if (!IsNumber(chr))
+                    if (!IsNumber(chr,hexAllowed:hexAllowed))
                     {
                         break;
                     }
@@ -455,20 +454,17 @@ namespace BasicPlusParser
                 Advance();
             }
 
-            
-
-
             if (_source[start] == '\\' && !Match('\\'))
             {
-                Error.ReportError(_lineNo,"Number must end in \\");
+                _tokenErrors.ReportError(_lineNo, "Number must end in \\");
                 return null;
             }
 
             string number = _source[start.._pos];
 
-            if (number == ".")
+            if (number.Last() == '.')
             {
-                Error.ReportError(_lineNo, "Invalid dot.");
+                _tokenErrors.ReportError(_lineNo, "Invalid decimal point.");
                 return null;
             }
 
