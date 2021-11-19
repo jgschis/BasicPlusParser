@@ -11,7 +11,7 @@ namespace BasicPlusParser.Statements
     public class MatStatement : Statement
     {
         public IdExpression Variable;
-        public Expression Expr;
+        public Expression Value;
         public IdExpression OtherMatrix;
     }
 }

@@ -915,14 +915,33 @@ namespace BasicPlusParser
         public Statement ParseMatStmt()
         {
             Token matrix = ConsumeIdToken();
+            if (!IsMatrix(matrix))
+            {
+                throw Error(GetLineNo(), $"The identifier {matrix.Text} must be dimensioned.");
+            }
+
+            Expression value = null;
+            IdExpression otherMatrix = null;
             ConsumeToken(typeof(EqualToken));
-            Token otherMatrix = null;
-            Expression expr = ParseExpr();
+            if (NextTokenIs(typeof(MatToken))) {
+
+                Token otherMatrixToken = ConsumeIdToken();
+                if (!IsMatrix(otherMatrixToken))
+                {
+                    throw Error(GetLineNo(), $"The identifier {otherMatrixToken.Text} must be dimensioned.");
+                }
+                otherMatrix = new IdExpression(otherMatrixToken.Text, IdentifierType.Reference);
+            }
+            else
+            {
+                value = ParseExpr();
+            }
+           
             return new MatStatement
             {
                 Variable = new IdExpression(matrix.Text),
-                Expr = expr,
-                OtherMatrix = new IdExpression(otherMatrix?.Text, IdentifierType.Reference)
+                Value = value,
+                OtherMatrix = otherMatrix
             };
         }
 
@@ -1292,7 +1311,6 @@ namespace BasicPlusParser
             };
         }
 
-
         Statement ParseInitRndStmt()
         {
             Expression seed = ParseExpr();
@@ -1579,8 +1597,7 @@ namespace BasicPlusParser
                 }
             }
 
-            Token optoken;
-            while (NextTokenIs(out optoken, typeof(AndToken), typeof(OrToken), typeof(MatchesToken)))
+            while (NextTokenIs(out Token optoken, typeof(AndToken), typeof(OrToken), typeof(MatchesToken)))
             {
                 Expression right = this.ParseLogExpr(inArray: inArray);
 
@@ -1604,8 +1621,7 @@ namespace BasicPlusParser
         Expression ParseLogExpr(bool inArray = false)
         {
             Expression expr = ParseConcatExpr();
-            Token optoken;
-            while (NextTokenIs( out optoken, typeof(LAngleBracketToken), typeof(RAngleBracketToken), typeof(EqualToken), typeof(ExcalmEqToken),
+            while (NextTokenIs( out Token optoken, typeof(LAngleBracketToken), typeof(RAngleBracketToken), typeof(EqualToken), typeof(ExcalmEqToken),
                 typeof(HashTagToken), typeof(GeToken), typeof(LteToken),typeof(EqToken),typeof(NeToken),
                 typeof(LtToken),typeof(LeToken),typeof(GtToken),typeof(EqcToken),typeof(NecToken),
                 typeof(LtcToken),typeof(LecToken),typeof(GtcToken),typeof(GecToken),typeof(EqxToken),
@@ -1613,12 +1629,12 @@ namespace BasicPlusParser
             {
                 if (optoken is RAngleBracketToken && inArray)
                 {
-                    // Since we are in an array, take the right angle bracket as the delimiter of the array.
+                    // Since we are in an array, take the right angle bracket as the terminator of the array.
                     _nextTokenIndex -= 1;
                     return expr;
                 }
-                Expression right;
 
+                Expression right;
                 if  (optoken is LAngleBracketToken && NextTokenIs(typeof(RAngleBracketToken))){
                     right = ParseConcatExpr();
                     expr = new NotEqExpression { Left = expr, Right = right, Operator = optoken.Text };
@@ -1665,8 +1681,7 @@ namespace BasicPlusParser
         Expression ParseConcatExpr()
         {
             Expression expr = ParseAddExpr();
-            Token optoken;
-            while (NextTokenIs(out optoken, typeof(ColonToken), typeof(MultiValueConcatToken)))
+            while (NextTokenIs(out Token optoken, typeof(ColonToken), typeof(MultiValueConcatToken)))
             {
                 Expression right = this.ParseAddExpr();
 
@@ -1686,8 +1701,7 @@ namespace BasicPlusParser
         Expression ParseAddExpr()
         {
             Expression expr = ParseMulExpr();
-            Token optoken;
-            while (NextTokenIs(out optoken, typeof(PlusToken), typeof(MinusToken),
+            while (NextTokenIs(out Token optoken, typeof(PlusToken), typeof(MinusToken),
                 typeof(MultiValueSubToken),typeof(MultiValueAddToken))) {
                 Expression right = this.ParseMulExpr();
                 if (optoken is PlusToken)
@@ -1710,23 +1724,10 @@ namespace BasicPlusParser
             return expr;
         }
 
-        Expression ParseArrayInitExpression(Token token)
-        {
-            List<Expression> indexes = new List<Expression>();
-            do
-            {
-                indexes.Add(ParseExpr());
-
-            } while (NextTokenIs(typeof(CommaToken)));
-            ConsumeToken(typeof(RSqrBracketToken));
-            return new ArrayInitExpression{ Sequence = indexes };
-        }
-
         Expression ParseMulExpr()
         {
             Expression expr = ParsePowerExpr();
-            Token optoken;
-            while (NextTokenIs(out optoken, typeof(StarToken), typeof(SlashToken),
+            while (NextTokenIs(out Token optoken, typeof(StarToken), typeof(SlashToken),
                 typeof(MultiValueMullToken),typeof(MultiValueDivToken))) {
                 Expression right = ParsePowerExpr();
                 if (optoken is StarToken)
@@ -1752,8 +1753,7 @@ namespace BasicPlusParser
         Expression ParsePowerExpr()
         {
             Expression expr = ParseAtom();
-            Token optoken;
-            while (NextTokenIs(out optoken, typeof(PowerToken)))
+            while (NextTokenIs(out Token optoken, typeof(PowerToken)))
             {
                 Expression right = ParseAtom();
                 expr = new PowerExpression { Left = expr, Right = right, Operator = optoken.Text };
@@ -1761,107 +1761,40 @@ namespace BasicPlusParser
             return expr;
         }
 
-        Expression ParseIfExpression(Token token)
-        {
-            Expression thenBlock = null;
-            Expression elseBlock = null;
-            Expression cond = ParseExpr();
-            if (NextTokenIs(typeof(ThenToken))){
-                thenBlock = ParseExpr();
-            }
-            if (NextTokenIs(typeof(ElseToken))){
-                elseBlock = ParseExpr();
-            }
-            return new IfExpression { Then = thenBlock, Condition = cond, Else = elseBlock };
-        }
-
-        Expression ParseAngleArray(Token token, Expression baseExpr)
-        {
-
-            if (PeekNextToken() is RAngleBracketToken)
-            {
-                _nextTokenIndex -= 1;
-                return null;
-            }
-
-            int tokenPos = _nextTokenIndex - 1;
-            List<Expression> indexes = new List<Expression>();
-            do
-            {
-                indexes.Add(ParseExpr(inArray: true));
-
-            } while (indexes.Count < 4 && NextTokenIs(typeof(CommaToken)));
-
-            if (PeekNextToken() is RAngleBracketToken)
-            {
-                _nextTokenIndex += 1;
-                return new AngleArrExpression { Indexes = indexes, Source = baseExpr };
-            }
-            else
-            {
-                // We assumed that we had an array, but we do not.
-                // Backtrack.
-                _nextTokenIndex = tokenPos;
-                return null;
-            }
-        }
-
-        Expression ParseSqrBracketArray(Token token, Expression expr)
-        {
-            List<Expression> indexes = new List<Expression>();
-            do
-            {
-                indexes.Add(ParseExpr());
-
-            } while (indexes.Count < 2 && NextTokenIs(typeof(CommaToken)));
-            ConsumeToken(typeof(RSqrBracketToken));
-            return new SqrArrExpression { Indexes = indexes, Source = expr};
-        }
-
-        Expression ParseFunc(Token token)
-        {
-            List<Expression> args = new List<Expression>();
-            while (!NextTokenIs(typeof(RParenToken)) && args.Count < MAX_PARAMS)
-            {
-                Expression arg = ParseExpr();
-                if (arg is IdExpression)
-                {
-                    ((IdExpression)arg).IdentifierType = IdentifierType.Assignment;
-                }
-                args.Add(arg);
-                NextTokenIs(typeof(CommaToken));
-
-            }
-            return new FuncExpression { Args = args, Function = new IdExpression(token.Text, IdentifierType.Function) };
-        }
-
         Expression ParseAtom()
         {
             Expression expr;
-            NextTokenIs(typeof(MatToken));
             Token token = GetNextToken();
 
-            if (token is IdentifierToken && token.DisallowFunction == false)
+            if (token is IdentifierToken )
             {
                 if (NextTokenIs(typeof(LParenToken)))
                 {
-                    expr = ParseFunc(token);
+                    if (IsMatrix(token)){
+                        expr = ParseMatrixIndexExpression(token);
+                    }
+                    else if (token.DisallowFunction == false)
+                    {
+                        expr = ParseFunc(token);
+                    }
+                    else
+                    {
+                        throw Error(GetLineNo(), "Expression expected.");
+                    }
+                }
+                else if (token is IfToken)
+                {
+                    expr = ParseIfExpression(token);
                 }
                 else
                 {
-                    expr = new IdExpression (token.Text, IdentifierType.Reference);
+                    expr = new IdExpression(token.Text, IdentifierType.Reference);
                 }
-
-            }
-            else if(token is IfToken)
-            {
-                expr = ParseIfExpression(token);
             }
             else if (token is NumberToken)
             {
                 expr = new NumExpression { Value = token.Text };
             }
-
             else if (token is StringToken)
             {
                 expr = new StringExpression { Value = token.Text };
@@ -1913,6 +1846,120 @@ namespace BasicPlusParser
                 }
             }
             return expr;
+        }
+
+        Expression ParseArrayInitExpression(Token token)
+        {
+            List<Expression> indexes = new();
+            do
+            {
+                indexes.Add(ParseExpr());
+
+            } while (NextTokenIs(typeof(CommaToken)));
+            ConsumeToken(typeof(RSqrBracketToken));
+            return new ArrayInitExpression { Sequence = indexes };
+        }
+
+
+        Expression ParseIfExpression(Token token)
+        {
+            Expression thenBlock = null;
+            Expression elseBlock = null;
+            Expression cond = ParseExpr();
+            if (NextTokenIs(typeof(ThenToken)))
+            {
+                thenBlock = ParseExpr();
+            }
+            if (NextTokenIs(typeof(ElseToken)))
+            {
+                elseBlock = ParseExpr();
+            }
+            return new IfExpression { Then = thenBlock, Condition = cond, Else = elseBlock };
+        }
+
+        Expression ParseAngleArray(Token token, Expression baseExpr)
+        {
+            if (PeekNextToken() is RAngleBracketToken)
+            {
+                // We don't have an array.
+                _nextTokenIndex -= 1;
+                return null;
+            }
+
+            int tokenPos = _nextTokenIndex - 1;
+            List<Expression> indexes = new();
+            do
+            {
+                indexes.Add(ParseExpr(inArray: true));
+
+            } while (indexes.Count < 4 && NextTokenIs(typeof(CommaToken)));
+
+            if (PeekNextToken() is RAngleBracketToken)
+            {
+                _nextTokenIndex += 1;
+                return new AngleArrExpression { Indexes = indexes, Source = baseExpr };
+            }
+            else
+            {
+                // We assumed that we had an array, but we do not.
+                // Backtrack.
+                _nextTokenIndex = tokenPos;
+                return null;
+            }
+        }
+
+        Expression ParseSqrBracketArray(Token token, Expression expr)
+        {
+            List<Expression> indexes = new();
+            do
+            {
+                indexes.Add(ParseExpr());
+
+            } while (indexes.Count < 2 && NextTokenIs(typeof(CommaToken)));
+            ConsumeToken(typeof(RSqrBracketToken));
+            return new SqrArrExpression { Indexes = indexes, Source = expr };
+        }
+
+        Expression ParseFunc(Token token)
+        {
+            List<Expression> args = new();
+            while (!NextTokenIs(typeof(RParenToken)))
+            {
+                Expression arg;
+                if (NextTokenIs(typeof(MatToken)))
+                {
+                    Token matrix = ConsumeIdToken();
+                    if (!IsMatrix(matrix))
+                    {
+                        throw Error(GetLineNo(), $"The identifier {matrix} must be dimensioned.");
+                    }
+                    arg = new IdExpression(matrix.Text, IdentifierType.Reference);
+                } else
+                {
+                    arg = ParseExpr();
+                    if (arg is IdExpression)
+                    {
+                        ((IdExpression)arg).IdentifierType = IdentifierType.Assignment;
+                    }
+                }
+
+                args.Add(arg);
+                NextTokenIs(typeof(CommaToken));
+            }
+            return new FuncExpression { Args = args, Function = new IdExpression(token.Text, IdentifierType.Function) };
+        }
+
+        Expression ParseMatrixIndexExpression(Token token)
+        {
+            Expression row = ParseExpr();
+            Expression col = null;
+            if (NextTokenIs(typeof(CommaToken))){
+                col = ParseExpr();
+            }
+            ConsumeToken(typeof(RParenToken));
+
+            return new MatrixIndexExpression { Col = col, Row = row, 
+                Name = new IdExpression(token.Text, IdentifierType.Reference) };
         }
 
         Token PeekNextToken(int lookAhead = 0)
