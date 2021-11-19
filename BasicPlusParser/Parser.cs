@@ -58,6 +58,8 @@ namespace BasicPlusParser
                 {
                     ConsumeToken(typeof(CommaToken));
                 }
+                // Todo, need to mark a parameter as a matrix.
+                ConsumeToken(typeof(MatToken), optional: true);
                 Token arg = ConsumeIdToken();
                 args.Add(arg);
             }
