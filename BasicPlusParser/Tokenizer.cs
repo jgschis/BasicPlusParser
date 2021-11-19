@@ -119,9 +119,8 @@ namespace BasicPlusParser
                 case '/':
                     if (Match("//")) return new MultiValueDivToken { Text = "///" };
                     else if (Match("=")) return new SlashEqualToken { Text = "/=" };
-                    else if (Match("/") && StartOfStmt()) return ScanSingleLineComment();
+                    else if (StartOfStmt() && Match("/")) return ScanSingleLineComment();
                     else if (Match("*")) return ScanMultiLineComment();
-                    else if (_prevToken is CommonToken) return ScanCommonNameToken();
                     else return new SlashToken { Text = character.ToString() };
                 case '*':
                     if (StartOfStmt()) return ScanSingleLineComment();

@@ -16,7 +16,7 @@ namespace BasicPlusParser
         Token _nextToken => _nextTokenIndex < _tokens.Count ? _tokens[_nextTokenIndex] : null;
         Token _prevToken => _nextTokenIndex > 0 ? _tokens[_nextTokenIndex - 1] : null;
         Dictionary<string, (List<Statement>, int pos)> _labels = new();
-        HashSet<string> _matricies = new();
+        Dictionary<string, Matrix> _matricies = new();
         ParseErrors _parseErrors = new();
 
         public Parser(string text)
@@ -98,17 +98,16 @@ namespace BasicPlusParser
             Token token = GetNextToken();
             if (token is IdentifierToken)
             {
-                if (NextTokenIs(typeof(EqualToken)))
+                if (!IsMatrix(token) && NextTokenIs(typeof(EqualToken)))
                 {
                     return ParseAssignmentStmt(token);
 
                 }
-                else if (NextTokenIs(typeof(LAngleBracketToken)))
+                else if (!IsMatrix(token) && NextTokenIs(typeof(LAngleBracketToken)))
                 {
-
                     return ParseAngleAssignmentStmt(token);
                 }
-                else if (token.DisallowFunction == false && NextTokenIs(typeof(LSqrBracketToken)))
+                else if (!IsMatrix(token) && token.DisallowFunction == false && NextTokenIs(typeof(LSqrBracketToken)))
                 {
                     return ParseSquareBracketArrayAssignmentStmt(token);
                 }
@@ -116,19 +115,19 @@ namespace BasicPlusParser
                 {
                     return ParseInternalSubStmt(token);
                 }
-                else if (NextTokenIs(typeof(PlusEqualToken)))
+                else if (!IsMatrix(token) && NextTokenIs(typeof(PlusEqualToken)))
                 {
                     return ParsePlusAssignmentStmt(token);
                 }
-                else if (NextTokenIs(typeof(MinusEqualToken)))
+                else if (!IsMatrix(token) && NextTokenIs(typeof(MinusEqualToken)))
                 {
                     return ParseMinusAssignmentStmt(token);
                 }
-                else if (NextTokenIs(typeof(SlashEqualToken)))
+                else if (!IsMatrix(token) && NextTokenIs(typeof(SlashEqualToken)))
                 {
                     return ParseDivideAssignmentStmt(token);
                 }
-                else if (NextTokenIs(typeof(StarEqualToken)))
+                else if (!IsMatrix(token) && NextTokenIs(typeof(StarEqualToken)))
                 {
                     return ParseMulAssignmentStmt(token);
                 }
@@ -326,7 +325,7 @@ namespace BasicPlusParser
                 }
                 else if (token is OnToken)
                 {
-                    return ParseJumpStmt();
+                    return ParseOnGosubOrOnGotoStmt();
                 }
                 else if (token is OsOpenToken)
                 {
@@ -538,13 +537,6 @@ namespace BasicPlusParser
 
             return (thenBlock, elseBlock);
         }
-
-        ParseException Error (int lineNo, string message)
-        {
-            _parseErrors.ReportError(lineNo, message);
-            return new ParseException();
-        }
-
 
         Statement ParseMatWriteStmt()
         {
@@ -765,7 +757,7 @@ namespace BasicPlusParser
             } 
         }
 
-        Statement ParseJumpStmt()
+        Statement ParseOnGosubOrOnGotoStmt()
         {
             bool isGosub = false;
 
@@ -1226,8 +1218,9 @@ namespace BasicPlusParser
                     col = ParseExpr();
                 }
                 ConsumeToken(typeof(RParenToken));
-                matricies.Add(new Matrix ( matVar.Text,col,row));
-                _matricies.Add(matVar.Text.ToLower());
+                Matrix matrix = new Matrix(matVar.Text, col, row);
+                matricies.Add(matrix);
+                _matricies.Add(matVar.Text.ToLower(),matrix);
 
             } while (NextTokenIs(typeof(CommaToken)));
 
@@ -1271,7 +1264,19 @@ namespace BasicPlusParser
 
         Statement ParseCommonStmt()
         {
+            int nSlashes = 1;
+            ConsumeToken(typeof(SlashToken));
+            if (NextTokenIs(typeof(SlashToken))) {
+                nSlashes += 1;
+            }
+
             Token commonBlockId = ConsumeIdToken();
+
+            for(int i = 1; i <= nSlashes;i++)
+            {
+                ConsumeToken(typeof(SlashToken));
+            }
+
             List<IdExpression> globalVars = new();
             do
             {
@@ -1910,7 +1915,6 @@ namespace BasicPlusParser
             return expr;
         }
 
-
         Token PeekNextToken(int lookAhead = 0)
         {
             if (_nextTokenIndex + lookAhead < _tokens.Count)
@@ -1959,8 +1963,7 @@ namespace BasicPlusParser
                 {
                     errMsg = $"Expected {expected}";
                 }
-                _parseErrors.ReportError(_nextToken.LineNo, errMsg);
-                throw new ParseException();
+                throw Error(_nextToken.LineNo, errMsg);
             }
             return _tokens[_nextTokenIndex++];
         }
@@ -1979,8 +1982,7 @@ namespace BasicPlusParser
                 {
                     errMsg = $"Expected {expected}";
                 }
-                _parseErrors.ReportError(_nextToken.LineNo, errMsg);
-                throw new ParseException();
+                throw Error(_nextToken.LineNo, errMsg);
             }
             return _tokens[_nextTokenIndex++];
         }
@@ -2025,7 +2027,13 @@ namespace BasicPlusParser
 
         bool IsMatrix(Token token)
         {
-            return _matricies.Contains(token.Text.ToLower());
+            return _matricies.ContainsKey(token.Text.ToLower());
+        }
+
+        ParseException Error(int lineNo, string message)
+        {
+            _parseErrors.ReportError(lineNo, message);
+            return new ParseException();
         }
     }
 }
