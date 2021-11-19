@@ -202,45 +202,6 @@ namespace BasicPlusParser
                 (hexAllowed && (chr >= 'a' && chr <= 'f') || (chr >= 'A' && chr <= 'F'));
         }
 
-        CommonNameToken ScanCommonNameToken()
-        {
-            CommonNameToken token = new();
-            string terminator = "/";
-            if (Match('/'))
-            {
-                terminator += "/";
-            }
-
-            int start = _pos;
-            while (Peek() != '/' && !IsAtEnd())
-            {
-                char chr = Advance();
-
-                if (chr == '\r')
-                {
-                    _pos += 1;
-                    _tokenErrors.ReportError(_lineNo, "New line is not allowed in common block.");
-                    return null;
-                }
-            }
-
-            if (IsAtEnd())
-            {
-                _tokenErrors.ReportError(_lineNo, $"A common block must end with {terminator}");
-                return null;
-            }
-
-
-            if (!Match(terminator))
-            {
-                _tokenErrors.ReportError(_lineNo, $"A common block must end with {terminator}");
-                return null;
-            }
-
-            token.Text = _source[start.._pos];
-            return token;
-        }
-
         bool StartOfStmt()
         {
             return (_prevToken is NewLineToken || _prevToken is SemiColonToken || _prevToken == null);
