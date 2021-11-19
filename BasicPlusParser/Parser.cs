@@ -917,7 +917,7 @@ namespace BasicPlusParser
             Token matrix = ConsumeIdToken();
             if (!IsMatrix(matrix))
             {
-                throw Error(GetLineNo(), $"The identifier {matrix.Text} must be dimensioned.");
+                _parseErrors.ReportError(GetLineNo(), $"The identifier {matrix.Text} must be dimensioned.");
             }
 
             Expression value = null;
@@ -928,7 +928,7 @@ namespace BasicPlusParser
                 Token otherMatrixToken = ConsumeIdToken();
                 if (!IsMatrix(otherMatrixToken))
                 {
-                    throw Error(GetLineNo(), $"The identifier {otherMatrixToken.Text} must be dimensioned.");
+                    _parseErrors.ReportError(GetLineNo(), $"The identifier {otherMatrixToken.Text} must be dimensioned.");
                 }
                 otherMatrix = new IdExpression(otherMatrixToken.Text, IdentifierType.Reference);
             }
@@ -1925,13 +1925,18 @@ namespace BasicPlusParser
             List<Expression> args = new();
             while (!NextTokenIs(typeof(RParenToken)))
             {
+                if (args.Count > 0)
+                {
+                    ConsumeToken(typeof(CommaToken));
+                }
+
                 Expression arg;
                 if (NextTokenIs(typeof(MatToken)))
                 {
                     Token matrix = ConsumeIdToken();
                     if (!IsMatrix(matrix))
                     {
-                        throw Error(GetLineNo(), $"The identifier {matrix} must be dimensioned.");
+                        _parseErrors.ReportError(GetLineNo(), $"The identifier {matrix.Text} must be dimensioned.");
                     }
                     arg = new IdExpression(matrix.Text, IdentifierType.Reference);
                 } else
@@ -1944,7 +1949,6 @@ namespace BasicPlusParser
                 }
 
                 args.Add(arg);
-                NextTokenIs(typeof(CommaToken));
             }
             return new FuncExpression { Args = args, Function = new IdExpression(token.Text, IdentifierType.Function) };
         }
