@@ -1915,10 +1915,14 @@ namespace BasicPlusParser
             {
                 indexes.Add(ParseExpr(inArray: true));
 
-            } while (indexes.Count < 4 && NextTokenIs(typeof(CommaToken)));
+            } while (NextTokenIs(typeof(CommaToken)));
 
             if (PeekNextToken() is RAngleBracketToken)
             {
+                if (indexes.Count > 4)
+                {
+                    _parseErrors.ReportError(GetLineNo(), $"Array {token.Text} has more than 4 indexes.");
+                }
                 _nextTokenIndex += 1;
                 return new AngleArrExpression { Indexes = indexes, Source = baseExpr };
             }
@@ -1938,7 +1942,13 @@ namespace BasicPlusParser
             {
                 indexes.Add(ParseExpr());
 
-            } while (indexes.Count < 2 && NextTokenIs(typeof(CommaToken)));
+            } while (NextTokenIs(typeof(CommaToken)));
+
+            if (indexes.Count > 2)
+            {
+                _parseErrors.ReportError(GetLineNo(), $"Array {token.Text} has more than 2 indexes.");
+            }
+
             ConsumeToken(typeof(RSqrBracketToken));
             return new SqrArrExpression { Indexes = indexes, Source = expr };
         }
