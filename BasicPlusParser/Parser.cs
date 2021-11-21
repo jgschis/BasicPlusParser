@@ -17,7 +17,10 @@ namespace BasicPlusParser
         Token _prevToken => _nextTokenIndex > 0 ? _tokens[_nextTokenIndex - 1] : null;
         Dictionary<string, (List<Statement>, int pos)> _labels = new();
         Dictionary<string, Matrix> _matricies = new();
+        HashSet<string> _functions = new();
+        HashSet<string> _subroutines = new();
         ParseErrors _parseErrors = new();
+
 
         public Parser(string text)
         {
@@ -84,8 +87,9 @@ namespace BasicPlusParser
                     if (stop(statements)) break;
 
                     int lineNo = GetLineNo();
+                    int lineCol = GetLineCol();
                     statements.Add(ParseStmt(inLoop: inLoop));
-                    AnnotateStmt(statements, lineNo);
+                    AnnotateStmt(statements, lineNo, lineCol);
                 }
                 catch
                 {
@@ -390,10 +394,11 @@ namespace BasicPlusParser
             throw Error(GetLineNo(), "Semicolon or newline expected.");
         }
 
-        void AnnotateStmt(List<Statement> statements, int lineNo)
+        void AnnotateStmt(List<Statement> statements, int lineNo, int lineCol)
         {
             Statement statement = statements.Last();
             statement.LineNo = lineNo;
+            statement.LineCol = lineCol;
             switch (statement)
             {
                 case
@@ -644,13 +649,12 @@ namespace BasicPlusParser
             return new AssignmentStatement { Value = expr, Variable = new IdExpression(token.Text,IdentifierType.Assignment) };
         }
 
-
         Statement ParseDeclareStmt()
         {
-            List<IdExpression> functions = new List<IdExpression>();
+            List<IdExpression> functions = new();
             ProgramType pType;
-            Token funcType = ConsumeToken("Expected subroutine or function.", false, typeof(SubroutineToken), typeof(FunctionToken));
-            if (funcType is SubroutineToken)
+            Token token = ConsumeToken("Expected subroutine or function.", false, typeof(SubroutineToken), typeof(FunctionToken)); 
+            if (token is SubroutineToken)
             {
                 pType = ProgramType.Subroutine;
             } 
@@ -663,9 +667,15 @@ namespace BasicPlusParser
             {
                 Token func = ConsumeIdToken();
                 functions.Add(new IdExpression(func.Text, IdentifierType.Function));
+                if (pType == ProgramType.Subroutine)
+                {
+                    _subroutines.Add(func.Text.ToLower());
+                } else
+                {
+                    _functions.Add(func.Text.ToLower());
+                }
             } while (NextTokenIs(typeof(CommaToken)));
 
-           
             return new DeclareStatement
             {
                 PType = pType,
@@ -894,8 +904,7 @@ namespace BasicPlusParser
 
         Statement ParseFunctionCallStmt(Token token)
         {
-            _nextTokenIndex -= 2;
-            FuncExpression funcExpr = (FuncExpression) ParseExpr();
+            FuncExpression funcExpr = (FuncExpression) ParseFunc(token, mustReturnValue:false);
             return new FunctionCallStatement
             {
                 Expr = funcExpr
@@ -1922,8 +1931,22 @@ namespace BasicPlusParser
             return new SqrArrExpression { Indexes = indexes, Source = expr };
         }
 
-        Expression ParseFunc(Token token)
+        Expression ParseFunc(Token token, bool mustReturnValue = true)
         {
+            if (mustReturnValue)
+            {
+                if (!_functions.Contains(token.Text.ToLower()))
+                {
+                    _parseErrors.ReportError(GetLineNo(), $"{token.Text} must be declared as a function");
+                }
+            } else
+            {
+                if (!_subroutines.Contains(token.Text.ToLower()))
+                {
+                    _parseErrors.ReportError(GetLineNo(), $"{token.Text} must be declared as a subroutine.");
+                }
+            }
+
             List<Expression> args = new();
             while (!NextTokenIs(typeof(RParenToken)))
             {
@@ -2078,9 +2101,19 @@ namespace BasicPlusParser
             return PeekNextToken()?.LineNo ?? _tokens.Last().LineNo;
         }
 
+        int GetLineCol()
+        {
+            return PeekNextToken()?.Col ?? _tokens.Last().LineNo;
+        }
+
         bool IsMatrix(Token token)
         {
             return _matricies.ContainsKey(token.Text.ToLower());
+        }
+
+        bool IsFunctionOrSubroutine(Token token)
+        {
+            return _functions.Contains(token.Text.ToLower()) || _subroutines.Contains(token.Text.ToLower());
         }
 
         ParseException Error(int lineNo, string message)
