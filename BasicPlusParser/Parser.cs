@@ -19,6 +19,7 @@ namespace BasicPlusParser
         Dictionary<string, Matrix> _matricies = new();
         HashSet<string> _functions = new();
         HashSet<string> _subroutines = new();
+        HashSet<string> _equates = new();
         ParseErrors _parseErrors = new();
 
 
@@ -424,7 +425,6 @@ namespace BasicPlusParser
             if (NextTokenIs(typeof(AllToken))){
                 return new UnlockAllStatement();
             }
-
 
             if (NextTokenIs(typeof(CursorToken)))
             {
@@ -895,6 +895,13 @@ namespace BasicPlusParser
             Token var = ConsumeIdToken();
             ConsumeToken(typeof(ToToken));
             Expression val = ParseExpr();
+            if (!_equates.Contains(var.Text.ToLower()))
+            {
+                _equates.Add(var.Text.ToLower());
+            } else
+            {
+                _parseErrors.ReportError(GetLineNo(), $"The equate constat {var.Text} has already been defined.");
+            }
             return new EquStatemnet
             {
                 Variable = new IdExpression(var.Text),
@@ -1262,7 +1269,12 @@ namespace BasicPlusParser
                 ConsumeToken(typeof(RParenToken));
                 Matrix matrix = new Matrix(matVar.Text, col, row);
                 matricies.Add(matrix);
-                _matricies.Add(matVar.Text.ToLower(),matrix);
+                if (!_matricies.ContainsKey(matVar.Text.ToLower())) {
+                    _matricies.Add(matVar.Text.ToLower(), matrix);
+                } else
+                {
+                    _parseErrors.ReportError(GetLineNo(), $"The matrix {matVar.Text} has already been defined.");
+                }
 
             } while (NextTokenIs(typeof(CommaToken)));
 
