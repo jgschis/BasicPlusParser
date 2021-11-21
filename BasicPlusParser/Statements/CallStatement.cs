@@ -9,6 +9,6 @@ namespace BasicPlusParser.Statements
 {
     public class CallStatement : Statement
     {
-        public Expression Expr;
+        public FuncExpression Expr;
     }
 }

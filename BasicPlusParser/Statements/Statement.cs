@@ -8,8 +8,8 @@ namespace BasicPlusParser
     public abstract class Statement
     {
         public int LineNo;
+        public int LineCol;
       
-
         public virtual HashSet<string> GetAssignedVars()
         {
             HashSet<string> assignedVars = new();
@@ -33,7 +33,6 @@ namespace BasicPlusParser
                             assignedVars.UnionWith(v.GetAssignedVars());
                         }
                         break;
-                  
                 }
             }
             return assignedVars;
@@ -67,6 +66,5 @@ namespace BasicPlusParser
             }
             return referencedVars;
         }
-
     }
 }

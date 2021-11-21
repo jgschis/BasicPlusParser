@@ -1199,8 +1199,20 @@ namespace BasicPlusParser
 
         Statement ParseCallStmt()
         {
-            Expression funcExpr = ParseExpr();
-            return new CallStatement
+            FuncExpression funcExpr;
+            Token funcName = ConsumeIdToken();
+            bool declarationRequired = funcName.Text[0] != '@';
+            if (NextTokenIs(typeof(LParenToken))){
+                funcExpr = (FuncExpression)ParseFunc(funcName, mustReturnValue: false, declarationRequired: declarationRequired);
+            } else
+            {
+                if (declarationRequired && !_subroutines.Contains(funcName.Text.ToLower()))
+                {
+                    _parseErrors.ReportError(GetLineNo(), $"{funcName.Text} must be declared as a subroutine.");
+                }
+                funcExpr = new FuncExpression { Function = new IdExpression(funcName.Text, IdentifierType.Function), Args = new() };
+            }
+                return new CallStatement
             {
                 Expr = funcExpr
             };
@@ -1931,19 +1943,23 @@ namespace BasicPlusParser
             return new SqrArrExpression { Indexes = indexes, Source = expr };
         }
 
-        Expression ParseFunc(Token token, bool mustReturnValue = true)
+        Expression ParseFunc(Token token, bool mustReturnValue = true, bool declarationRequired = true)
         {
-            if (mustReturnValue)
+            if (declarationRequired)
             {
-                if (!_functions.Contains(token.Text.ToLower()))
+                if (mustReturnValue)
                 {
-                    _parseErrors.ReportError(GetLineNo(), $"{token.Text} must be declared as a function");
+                    if (!_functions.Contains(token.Text.ToLower()))
+                    {
+                        _parseErrors.ReportError(GetLineNo(), $"{token.Text} must be declared as a function");
+                    }
                 }
-            } else
-            {
-                if (!_subroutines.Contains(token.Text.ToLower()))
+                else
                 {
-                    _parseErrors.ReportError(GetLineNo(), $"{token.Text} must be declared as a subroutine.");
+                    if (!_subroutines.Contains(token.Text.ToLower()))
+                    {
+                        _parseErrors.ReportError(GetLineNo(), $"{token.Text} must be declared as a subroutine.");
+                    }
                 }
             }
 
@@ -2109,11 +2125,6 @@ namespace BasicPlusParser
         bool IsMatrix(Token token)
         {
             return _matricies.ContainsKey(token.Text.ToLower());
-        }
-
-        bool IsFunctionOrSubroutine(Token token)
-        {
-            return _functions.Contains(token.Text.ToLower()) || _subroutines.Contains(token.Text.ToLower());
         }
 
         ParseException Error(int lineNo, string message)
