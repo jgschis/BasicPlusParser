@@ -35,6 +35,11 @@ namespace BasicPlusParser.Analyser
                     definiteOuterScope.UnionWith(statement.GetAssignedVars());
                 }
 
+                foreach (var err in statement.GetReferencedVars().Where(v => !definiteLocalScope.Contains(v)))
+                {
+                    UnassignedVars.Add((err, statement));
+                }
+
                 switch (statement)
                 {
                     case ReturnStatement:
@@ -56,10 +61,22 @@ namespace BasicPlusParser.Analyser
                         branchReturns |= thenReturns | elseReturns;
                         break;
                     case LoopRepeatStatement s:
-                        //innerAssignedVars.UnionWith(AnalyseCore(s.Statements, definiteLocalScope));
+                       (var loopRepeatReturns, var loopRepeatVars )= AnalyseCore(s.Statements, definiteLocalScope);
+                        definiteOuterScope.UnionWith(loopRepeatVars);
+                        if (!loopRepeatReturns)
+                        {
+                            definiteLocalScope.UnionWith(loopRepeatVars);
+                        }
+                        if (loopRepeatReturns) return (true, definiteOuterScope);
                         break;
                     case ForNextStatement s:
-                        //innerAssignedVars.UnionWith(AnalyseCore(s.Statements, definiteLocalScope));
+                        (var forNextReturns, var forNextVars) = AnalyseCore(s.Statements, definiteLocalScope);
+                        definiteOuterScope.UnionWith(forNextVars);
+                        if (!forNextReturns)
+                        {
+                            definiteLocalScope.UnionWith(forNextVars);
+                        }
+                        if (forNextReturns) return (true, definiteOuterScope);
                         break;
                     case CaseStmt s:
                         foreach (Case @case in s.Cases)
@@ -73,12 +90,7 @@ namespace BasicPlusParser.Analyser
                         definiteLocalScope.UnionWith(gosubVars);
                         definiteOuterScope.UnionWith(gosubVars);
                         break;
-                }
-
-                foreach ( var err in statement.GetReferencedVars().Where(v => !definiteLocalScope.Contains(v)))
-                {
-                    UnassignedVars.Add((err, statement));
-                }
+                } 
             }
             return (false, definiteOuterScope);
         }
