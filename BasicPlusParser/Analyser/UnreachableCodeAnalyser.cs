@@ -6,7 +6,7 @@ namespace BasicPlusParser.Analyser
     {
         OiProgram _prog;
         readonly List<Statement> UnreachableStatements = new();
-
+        List<string> _labelsSeen = new();
         public UnreachableCodeAnalyser(OiProgram prog)
         {
             _prog = prog;
@@ -18,7 +18,9 @@ namespace BasicPlusParser.Analyser
             bool gotoStatementSeen = false;
             foreach (Statement statement in statements)
             {
-                if (statement is not InternalSubStatement && (returnStatementSeen || gotoStatementSeen)){
+                bool statementNotReachable = statement is not InternalSubStatement && (returnStatementSeen || gotoStatementSeen);
+                if (statementNotReachable)
+                {
                     UnreachableStatements.Add(statement);
                 }
 
@@ -28,15 +30,21 @@ namespace BasicPlusParser.Analyser
                     case ReturnStatement:
                         returnStatementSeen = true;
                         break;
-                    case InternalSubStatement:
+                    case InternalSubStatement s:
+                        if (!(returnStatementSeen || gotoStatementSeen)) _labelsSeen.Add(s.Label.Name);
                         returnStatementSeen = false;
                         gotoStatementSeen = false;
                         break;
-                    case GoToStatement:
+                    case GoToStatement s:
+                        if (!statementNotReachable) _labelsSeen.Add(s.Label.Name);
                         gotoStatementSeen = true;
                         break;
+                    case GosubStatement s:
+                        if (!statementNotReachable) _labelsSeen.Add(s.Label.Name);
+                        break;
                     case ThenElseStatement s:
-                        childrenReturn = true && AnalyseCore(s.Then) && AnalyseCore(s.Else);
+                        childrenReturn = true && AnalyseCore(s.Then);
+                        childrenReturn &= AnalyseCore(s.Else);
                         break;
                     case ForNextStatement s:
                         childrenReturn = true && AnalyseCore(s.Statements);
@@ -59,6 +67,14 @@ namespace BasicPlusParser.Analyser
         public void Analyse()
         {
              AnalyseCore(_prog.Statements);
+             foreach (var lbl in _prog.Labels)
+            {
+                if (!_labelsSeen.Contains(lbl.Key))
+                {
+                    UnreachableStatements.Add(lbl.Value.Item1[lbl.Value.pos-1]);
+                }
+            }
+
         }
     }
 }
