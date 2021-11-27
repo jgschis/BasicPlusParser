@@ -15,41 +15,6 @@ namespace BasicPlusParser
         int _col;
         int _lineNo = 1;
 
-        bool IsAtEnd()
-        {
-            return _pos >= _source.Length;
-        }
-
-        bool Match(char expected)
-        {
-            if (IsAtEnd()) return false;
-            if (_source[_pos] != expected) return false;
-
-            _pos++;
-            return true;
-        }
-
-        char Advance() {
-            return _source[_pos++];
-        }
-
-        bool Match(string expected)
-        {
-            if (IsAtEnd()) return false;
-            if (_source.Substring(_pos).StartsWith(expected, StringComparison.OrdinalIgnoreCase)) {
-                _pos += expected.Length;
-                return true;
-            }
-            return false;
-
-        }
-
-        char Peek()
-        {
-            if (_pos >= _source.Length) return '\0';
-            return _source[_pos];
-        }
-
         public Tokenizer(string text, ParseErrors error)
         {
             _tokenErrors = error;
@@ -360,6 +325,7 @@ namespace BasicPlusParser
                 "osbwrite" => new OsBWriteToken { Text = idOrKeyword },
                 "length" => new LengthToken { Text = idOrKeyword },
                 "bremove" => new BRemoveToken { Text = idOrKeyword },
+                "insert" => new InsertDeclarationToken { Text = idOrKeyword },
                 "ge" => new GeToken { Text = idOrKeyword },
                 "ne" => new NeToken { Text = idOrKeyword },
                 "lt" => new LtToken { Text = idOrKeyword },
@@ -410,7 +376,6 @@ namespace BasicPlusParser
                         break;
                     }
                 }
-
                 Advance();
             }
 
@@ -429,6 +394,42 @@ namespace BasicPlusParser
             }
 
             return new NumberToken { Text = number };
+        }
+
+        bool IsAtEnd()
+        {
+            return _pos >= _source.Length;
+        }
+
+        bool Match(char expected)
+        {
+            if (IsAtEnd()) return false;
+            if (_source[_pos] != expected) return false;
+
+            _pos++;
+            return true;
+        }
+
+        char Advance()
+        {
+            return _source[_pos++];
+        }
+
+        bool Match(string expected)
+        {
+            if (IsAtEnd()) return false;
+            if (_source.Substring(_pos).StartsWith(expected, StringComparison.OrdinalIgnoreCase))
+            {
+                _pos += expected.Length;
+                return true;
+            }
+            return false;
+        }
+
+        char Peek()
+        {
+            if (_pos >= _source.Length) return '\0';
+            return _source[_pos];
         }
     }
 }

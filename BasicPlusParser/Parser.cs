@@ -9,8 +9,6 @@ namespace BasicPlusParser
 {
     public class Parser
     {
-        public const int MAX_PARAMS = 500;
-
         int _nextTokenIndex = 0;
         List<Token> _tokens = new();
         Token _nextToken => _nextTokenIndex < _tokens.Count ? _tokens[_nextTokenIndex] : null;
@@ -35,38 +33,50 @@ namespace BasicPlusParser
             program.Statements = ParseStmts(() => IsAtEnd());
             program.Labels = _labels;
             program.Errors = _parseErrors;
+            program.Matricies = _matricies;
+            program.Subroutines = _subroutines;
+            program.Equates = _equates;
+            program.Functions = _functions;
             return program;
         }
 
         OiProgram ParseProgramDeclaration()
         {
+            List<string> args = new();
             ProgramType programType;
             ConsumeToken(typeof(CompileToken), optional: true);
-            Token progType = ConsumeToken("Program type missing. Must be either function or subroutine.", false, typeof(SubroutineToken), typeof(FunctionToken));
+            Token progType = ConsumeToken("Program type missing. Must be either function, subroutine or insert.", false, typeof(SubroutineToken), typeof(FunctionToken), typeof(InsertDeclarationToken));
             if (progType is FunctionToken)
             {
                 programType = ProgramType.Function;
             }
-            else
+            else if (progType is SubroutineToken)
             {
                 programType = ProgramType.Subroutine;
             }
-
-
-            Token progName = ConsumeIdToken("Program must have a name.");
-            ConsumeToken(typeof(LParenToken));
-            List<Token> args = new();
-            while (!NextTokenIs(typeof(RParenToken)))
+            else
             {
-                if (args.Count > 0)
-                {
-                    ConsumeToken(typeof(CommaToken));
-                }
-                // Todo, need to mark a parameter as a matrix.
-                ConsumeToken(typeof(MatToken), optional: true);
-                Token arg = ConsumeIdToken();
-                args.Add(arg);
+                programType = ProgramType.Insert;
             }
+            Token progName = ConsumeIdToken("Program must have a name.");
+
+            if (programType == ProgramType.Function || programType == ProgramType.Subroutine)
+            {
+                ConsumeToken(typeof(LParenToken));
+           
+                while (!NextTokenIs(typeof(RParenToken)))
+                {
+                    if (args.Count > 0)
+                    {
+                        ConsumeToken(typeof(CommaToken));
+                    }
+                    // Todo, need to mark a parameter as a matrix.
+                    ConsumeToken(typeof(MatToken), optional: true);
+                    Token arg = ConsumeIdToken();
+                    args.Add(arg.Text);
+                }
+            }
+
             ConsumeToken(typeof(NewLineToken));
             return new OiProgram(programType, progName.Text, args);
         }
@@ -371,7 +381,7 @@ namespace BasicPlusParser
             {
                 return new EmptyStatement();
             }
-            throw Error(GetLineNo(), $"Unmatched token {token}.");
+            throw Error(GetLineNo(), $"{token.Text} is not a valid statement.");
         }
 
         void ConsumeStatementSeparator()
@@ -392,7 +402,7 @@ namespace BasicPlusParser
                 return;
             }
 
-            throw Error(GetLineNo(), "Semicolon or newline expected.");
+            throw Error(GetLineNo(), "Semicolon or newline expected after statement.");
         }
 
         void AnnotateStmt(List<Statement> statements, int lineNo, int lineCol)

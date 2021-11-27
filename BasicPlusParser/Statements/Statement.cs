@@ -24,7 +24,7 @@ namespace BasicPlusParser
                         assignedVars.Add(es.Name);
                         break;
 
-                    case Expression s:
+                    case Statement s:
                         assignedVars.UnionWith(s.GetAssignedVars());
                         break;
                     case List<Expression> ls:
@@ -53,7 +53,7 @@ namespace BasicPlusParser
                         referencedVars.Add(es.Name);
                         break;
     
-                    case Expression e:
+                    case Statement e:
                         referencedVars.UnionWith(e.GetReferencedVars());
                         break;
                     case List<Expression> ls:
