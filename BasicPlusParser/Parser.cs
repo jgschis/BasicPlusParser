@@ -1858,6 +1858,11 @@ namespace BasicPlusParser
             else if (token is MinusToken) {
                 expr = new NegateExpression { Operator = token.Text, Argument = ParseAtom() };
             }
+            else if (token is PlusToken)
+            {
+                // Unary + has not meaning, so just ignore it.
+                expr = ParseAtom();
+            }
             else if (token is NullToken)
             {
                 expr = new NullExpression();
