@@ -46,10 +46,11 @@ namespace BasicPlusParser.Analyser
                         return (true, definiteOuterScope);
 
                     case GoToStatement s:
-                        //AnalyseCore(_prog.Labels[s.Label.Name].Item1.Skip(_prog.Labels[s.Label.Name].pos), definiteLocalScope);
-                        // return (true, definiteOuterScope);
-                        break;
-
+                        (var gotReturns, var gotoVars) = AnalyseCore(_prog.Labels[s.Label.Name].Item1.Skip(_prog.Labels[s.Label.Name].pos), definiteLocalScope);
+                        definiteOuterScope.UnionWith(gotoVars);
+                        // Goto always (effectively) returns...
+                        return (true, definiteOuterScope);
+     
                     case ThenElseStatement s:
                         (var thenReturns, var thenVars) = AnalyseCore(s.Then, definiteLocalScope);
                         (var elseReturns, var elseVars) = AnalyseCore(s.Else, definiteLocalScope);
