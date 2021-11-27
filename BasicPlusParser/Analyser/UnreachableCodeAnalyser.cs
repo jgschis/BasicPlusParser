@@ -4,9 +4,15 @@ namespace BasicPlusParser.Analyser
 {
     public class UnreachableCodeAnalyser
     {
+        const string START = "";
+
         OiProgram _prog;
-        readonly List<Statement> UnreachableStatements = new();
-        List<string> _labelsSeen = new();
+        readonly List<string> UnreachableStatements = new();
+        string _currLabel = START;
+        Dictionary<string, List<string>> _reachabilityGraph = new();
+        HashSet<string> _reachableLabels = new();
+
+
         public UnreachableCodeAnalyser(OiProgram prog)
         {
             _prog = prog;
@@ -21,7 +27,7 @@ namespace BasicPlusParser.Analyser
                 bool statementNotReachable = statement is not InternalSubStatement && (returnStatementSeen || gotoStatementSeen);
                 if (statementNotReachable)
                 {
-                    UnreachableStatements.Add(statement);
+                    AddUnreachableStatement(statement);
                 }
 
                 bool childrenReturn = false;
@@ -31,16 +37,17 @@ namespace BasicPlusParser.Analyser
                         returnStatementSeen = true;
                         break;
                     case InternalSubStatement s:
-                        if (!(returnStatementSeen || gotoStatementSeen)) _labelsSeen.Add(s.Label.Name);
+                        if (!(returnStatementSeen || gotoStatementSeen)) UpdateReachabilityGraph(s.Label.Name);
+                        _currLabel = s.Label.Name;
                         returnStatementSeen = false;
                         gotoStatementSeen = false;
                         break;
                     case GoToStatement s:
-                        if (!statementNotReachable) _labelsSeen.Add(s.Label.Name);
+                        if (!statementNotReachable) UpdateReachabilityGraph(s.Label.Name);
                         gotoStatementSeen = true;
                         break;
                     case GosubStatement s:
-                        if (!statementNotReachable) _labelsSeen.Add(s.Label.Name);
+                        if (!statementNotReachable) UpdateReachabilityGraph(s.Label.Name);
                         break;
                     case ThenElseStatement s:
                         childrenReturn = true && AnalyseCore(s.Then);
@@ -64,17 +71,50 @@ namespace BasicPlusParser.Analyser
             return returnStatementSeen;
         }
     
-        public void Analyse()
+
+        void AddUnreachableStatement(Statement s)
         {
-             AnalyseCore(_prog.Statements);
-             foreach (var lbl in _prog.Labels)
+            UnreachableStatements.Add($"[{s.LineNo}]: {s}");
+        }
+
+        void UpdateReachabilityGraph(string label)
+        {
+            _reachabilityGraph[_currLabel].Add(label);
+        }
+
+        void AnalyseReachabilityGraphCore(string label)
+        {
+            foreach (string edgeLabel in _reachabilityGraph[label])
             {
-                if (!_labelsSeen.Contains(lbl.Key))
+                if (!_reachableLabels.Contains(edgeLabel))
                 {
-                    UnreachableStatements.Add(lbl.Value.Item1[lbl.Value.pos-1]);
+                    _reachableLabels.Add(edgeLabel);
+                    AnalyseReachabilityGraphCore(edgeLabel);
                 }
             }
+        }
 
+        void AnalyseReachabilityGraph()
+        {
+            AnalyseReachabilityGraphCore(START);
+            foreach(var label in _prog.Labels)
+            {
+                if (!_reachableLabels.Contains(label.Key))
+                {
+                    AddUnreachableStatement(label.Value.Item1[label.Value.pos - 1]);
+                }
+            }
+        }
+
+        public void Analyse()
+        {
+            _reachabilityGraph[START] = new();
+            foreach (var lbl in _prog.Labels)
+           {
+                _reachabilityGraph[lbl.Key] = new();
+           }
+            AnalyseCore(_prog.Statements);
+            AnalyseReachabilityGraph();
         }
     }
 }
