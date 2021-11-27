@@ -101,7 +101,7 @@ namespace BasicPlusParser.Analyser
             {
                 if (!_reachableLabels.Contains(label.Key))
                 {
-                    AddUnreachableStatement(label.Value.Item1[label.Value.pos - 1]);
+                    AddUnreachableStatement(label.Value.LabelStmt);
                 }
             }
         }

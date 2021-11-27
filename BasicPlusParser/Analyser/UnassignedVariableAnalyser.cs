@@ -46,7 +46,7 @@ namespace BasicPlusParser.Analyser
                         return (true, definiteOuterScope);
 
                     case GoToStatement s:
-                        (var gotReturns, var gotoVars) = AnalyseCore(_prog.Labels[s.Label.Name].Item1.Skip(_prog.Labels[s.Label.Name].pos), definiteLocalScope);
+                        (var gotReturns, var gotoVars) = AnalyseCore(_prog.Labels[s.Label.Name].StatementsFollowingLabel, definiteLocalScope);
                         definiteOuterScope.UnionWith(gotoVars);
                         // Goto always (effectively) returns...
                         return (true, definiteOuterScope);
@@ -86,11 +86,12 @@ namespace BasicPlusParser.Analyser
                         }
                         break;
                     case GosubStatement s:
-                        var stmtsAfterLabel = _prog.Labels[s.Label.Name].Item1.Skip(_prog.Labels[s.Label.Name].pos);
+                        var stmtsAfterLabel = _prog.Labels[s.Label.Name].StatementsFollowingLabel;
                         (var gosubReturns, var gosubVars) = AnalyseCore(stmtsAfterLabel, definiteLocalScope);
                         definiteLocalScope.UnionWith(gosubVars);
                         definiteOuterScope.UnionWith(gosubVars);
                         break;
+
                 } 
             }
             return (false, definiteOuterScope);
@@ -98,24 +99,17 @@ namespace BasicPlusParser.Analyser
 
         public  void Analyse()
         {
-
             HashSet<string> env = new();
+            // Todo, need to take into account inserts so we don't have to harcode these values...
             env.Add("true$");
             env.Add("false$");
-            env.Add("red$");
             env.Add("@window");
             env.Add("@svm");
             env.Add("@vm");
             env.Add("@fm");
             env.Add("param1");
             env.Add("focus");
-            env.Add("blue$");
             env.Add("event");
-            env.Add("white$");
-            env.Add("purchase_data");
-            env.Add("data");
-            env.Add("checkout_data");
-
 
             AnalyseCore(_prog.Statements,env);
         }

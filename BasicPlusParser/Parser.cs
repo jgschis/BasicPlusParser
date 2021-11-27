@@ -13,7 +13,7 @@ namespace BasicPlusParser
         List<Token> _tokens = new();
         Token _nextToken => _nextTokenIndex < _tokens.Count ? _tokens[_nextTokenIndex] : null;
         Token _prevToken => _nextTokenIndex > 0 ? _tokens[_nextTokenIndex - 1] : null;
-        Dictionary<string, (List<Statement>, int pos)> _labels = new();
+        Dictionary<string, Label> _labels = new();
         Dictionary<string, Matrix> _matricies = new();
         HashSet<string> _functions = new();
         HashSet<string> _subroutines = new();
@@ -414,7 +414,7 @@ namespace BasicPlusParser
             {
                 case
                     InternalSubStatement s:
-                    _labels.Add(s.Label.Name, (statements, statements.Count));
+                    _labels.Add(s.Label.Name, new Label(statements.Count, statements));
                     break;
             }
         }

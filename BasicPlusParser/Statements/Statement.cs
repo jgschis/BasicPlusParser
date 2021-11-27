@@ -30,7 +30,13 @@ namespace BasicPlusParser
                     case List<Expression> ls:
                         foreach (var v in ls)
                         {
-                            assignedVars.UnionWith(v.GetAssignedVars());
+                            if (v is IdExpression es && es.IdentifierType == IdentifierType.Assignment)
+                            {
+                                assignedVars.Add(es.Name);
+                            } else
+                            {
+                                assignedVars.UnionWith(v.GetAssignedVars());
+                            }
                         }
                         break;
                 }

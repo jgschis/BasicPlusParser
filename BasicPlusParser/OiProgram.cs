@@ -10,7 +10,7 @@ namespace BasicPlusParser
         public ProgramType PType;
         public List<Statement> Statements = new();
         public List<string> Parameters;
-        public Dictionary<string, (List<Statement>, int pos)> Labels = new();
+        public Dictionary<string, Label> Labels = new();
         public ParseErrors Errors;
         public Dictionary<string, Matrix> Matricies = new();
         public HashSet<string> Functions = new();
