@@ -3,10 +3,11 @@ This is a parser for the Basic + language (of Open Insight). The parser creates 
 
 ``` csharp
 string path = "...";
-            string sourceCode = File.ReadAllText(path);
+string sourceCode = File.ReadAllText(path);
      
-            Parser parser = new Parser(sourceCode);
-            OiProgram program = parser.Parse();
-            UnreachableCodeAnalyser analyser = new UnreachableCodeAnalyser(program);
-            analyser.Analyse();
+Parser parser = new Parser(sourceCode);
+OiProgram program = parser.Parse();
+
+UnreachableCodeAnalyser analyser = new UnreachableCodeAnalyser(program);
+analyser.Analyse();
 ```
