@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace BasicPlusParser.Tokens
 {
-    public class GecToken : Token
+    public class GecToken : OperatorToken
     {
     }
 }

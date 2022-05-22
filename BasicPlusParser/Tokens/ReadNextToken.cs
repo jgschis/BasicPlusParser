@@ -1,6 +1,6 @@
 ﻿namespace BasicPlusParser.Tokens
 {
-    public class ReadNextToken : IdentifierToken
+    public class ReadNextToken : KeywordToken
     {
     }
 }

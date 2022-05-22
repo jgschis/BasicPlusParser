@@ -1,6 +1,6 @@
 ﻿namespace BasicPlusParser.Tokens
 {
-    public class WriteVToken : IdentifierToken
+    public class WriteVToken : KeywordToken
     {
         
     }

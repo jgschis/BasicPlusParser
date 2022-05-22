@@ -9,6 +9,9 @@ namespace BasicPlusParser.Analyser
 
 
         public List<(string, Statement)> UnassignedVars = new();
+
+        //When we take a goto or gosub statement, store the statement so we don't take it again (to avoid infinite recursion)
+        readonly List<Statement> JumpsTaken = new();
       
         
         public UnassignedVariableAnalyser(OiProgram prog)
@@ -46,9 +49,13 @@ namespace BasicPlusParser.Analyser
                         return (true, definiteOuterScope);
 
                     case GoToStatement s:
-                        (var gotReturns, var gotoVars) = AnalyseCore(_prog.Labels[s.Label.Name].StatementsFollowingLabel, definiteLocalScope);
-                        definiteOuterScope.UnionWith(gotoVars);
-                        // Goto always (effectively) returns...
+                        if (!JumpsTaken.Contains(s))
+                        {
+                            JumpsTaken.Add(s);
+                            (var gotReturns, var gotoVars) = AnalyseCore(_prog.Labels[s.Label.Name].StatementsFollowingLabel, definiteLocalScope);
+                            definiteOuterScope.UnionWith(gotoVars);
+                            // Goto always (effectively) returns...
+                        }
                         return (true, definiteOuterScope);
      
                     case ThenElseStatement s:
@@ -86,10 +93,14 @@ namespace BasicPlusParser.Analyser
                         }
                         break;
                     case GosubStatement s:
-                        var stmtsAfterLabel = _prog.Labels[s.Label.Name].StatementsFollowingLabel;
-                        (var gosubReturns, var gosubVars) = AnalyseCore(stmtsAfterLabel, definiteLocalScope);
-                        definiteLocalScope.UnionWith(gosubVars);
-                        definiteOuterScope.UnionWith(gosubVars);
+                        if (!JumpsTaken.Contains(s))
+                        {
+                            JumpsTaken.Add(s);
+                            var stmtsAfterLabel = _prog.Labels[s.Label.Name].StatementsFollowingLabel;
+                            (var gosubReturns, var gosubVars) = AnalyseCore(stmtsAfterLabel, definiteLocalScope);
+                            definiteLocalScope.UnionWith(gosubVars);
+                            definiteOuterScope.UnionWith(gosubVars);
+                        }
                         break;
 
                 } 

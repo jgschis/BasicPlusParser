@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace BasicPlusParser.Tokens
 {
-    public class CommaToken : Token
+    public class CommaToken : OperatorToken
     {
     }
 }

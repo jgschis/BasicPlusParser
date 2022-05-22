@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace BasicPlusParser.Tokens
 {
-    public class RemoveToken : IdentifierToken
+    public class RemoveToken : KeywordToken
     {
         
     }

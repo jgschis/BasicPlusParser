@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace BasicPlusParser.Tokens
 {
-    public class PragmaToken : Token
+    public class PragmaToken : KeywordToken
     {
         
     }

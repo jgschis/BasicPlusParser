@@ -7,19 +7,30 @@ namespace BasicPlusParser
     {
         public bool HasError;
 
-        public List<string> Errors = new();
+        public List<ParseError> Errors = new();
 
-        public void ReportError(int line ,string message)
+        public void ReportError(int line ,string message, int startCol, int endCol)
         {
-            Errors.Add($"[Line {line}: {message}]");
+            Errors.Add(new ParseError
+            {
+                LineNo = line,
+                Message =message,
+                StartCol = startCol,
+                EndCol = endCol
+            });
             HasError = true;
         }
 
         public void ReportError(Token token, string message)
         {
-            Errors.Add($"[Line {token.LineNo}: {message}]");
+            Errors.Add(new ParseError
+            {
+                LineNo = token.LineNo,
+                Message = message,
+                StartCol = token.StartCol,
+                EndCol = token.EndCol
+            });
             HasError = true;
         }
-
     }
 }

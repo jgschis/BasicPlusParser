@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace BasicPlusParser.Tokens
 {
-    public class SlashToken : Token
+    public class SlashToken : OperatorToken
     {
     }
 }

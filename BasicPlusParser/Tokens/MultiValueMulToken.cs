@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace BasicPlusParser.Tokens
 {
-    public class MultiValueMullToken : Token
+    public class MultiValueMullToken : OperatorToken
     {
     }
 }

@@ -8,5 +8,6 @@ namespace BasicPlusParser.Tokens
 {
     public class IdentifierToken : Token
     {
+        public override string LsClass { get; set; } = "variable";
     }
 }

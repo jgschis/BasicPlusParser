@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace BasicPlusParser.Tokens
 {
-    public class OsBReadToken : IdentifierToken
+    public class OsBReadToken : KeywordToken
     {
     }
 }

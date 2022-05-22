@@ -18,8 +18,10 @@ namespace BasicPlusParser
         HashSet<string> _functions = new();
         HashSet<string> _subroutines = new();
         HashSet<string> _equates = new();
+        // Whenever we jump to a label, store the label so that at the end of parsing, we can check if the jump label 
+        // has been defined.
+        List<Statement> _jumpStatements = new();
         ParseErrors _parseErrors = new();
-
 
         public Parser(string text)
         {
@@ -45,12 +47,17 @@ namespace BasicPlusParser
             List<string> args = new();
             ProgramType programType;
             ConsumeToken(typeof(CompileToken), optional: true);
-            Token progType = ConsumeToken("Program type missing. Must be either function, subroutine or insert.", false, typeof(SubroutineToken), typeof(FunctionToken), typeof(InsertDeclarationToken));
-            if (progType is FunctionToken)
+
+            if (!NextTokenIs(out Token progTypeToken, typeof(SubroutineToken), typeof(FunctionToken), typeof(InsertDeclarationToken))) {
+                _parseErrors.ReportError(GetLineNo(), "Program type missing. Must be either function, subroutine or insert.", 0, 0);
+                // Default to subroutine so we can continue parsing for more errors...
+                programType = ProgramType.Subroutine;
+
+            } else if (progTypeToken is FunctionToken)
             {
                 programType = ProgramType.Function;
             }
-            else if (progType is SubroutineToken)
+            else if (progTypeToken is SubroutineToken)
             {
                 programType = ProgramType.Subroutine;
             }
@@ -58,27 +65,49 @@ namespace BasicPlusParser
             {
                 programType = ProgramType.Insert;
             }
-            Token progName = ConsumeIdToken("Program must have a name.");
 
+            string programName;
+            if (!NextTokenIs(out Token programNameToken, typeof(IdentifierToken))) {
+                _parseErrors.ReportError(PeekNextToken(), "The program requires a valid name.");
+                programName = "no_name";
+            } else { 
+                programName = programNameToken.Text;
+            }
+       
+            
             if (programType == ProgramType.Function || programType == ProgramType.Subroutine)
             {
-                ConsumeToken(typeof(LParenToken));
-           
-                while (!NextTokenIs(typeof(RParenToken)))
+                if (!NextTokenIs(typeof(LParenToken))){
+                    _parseErrors.ReportError(PeekNextToken(), "Left parentheses is required.");
+                }
+
+                if (PeekNextToken() is IdentifierToken || PeekNextToken() is MatToken)
                 {
-                    if (args.Count > 0)
+                    do
                     {
-                        ConsumeToken(typeof(CommaToken));
-                    }
-                    // Todo, need to mark a parameter as a matrix.
-                    ConsumeToken(typeof(MatToken), optional: true);
-                    Token arg = ConsumeIdToken();
-                    args.Add(arg.Text);
+                        // Todo, need to mark a parameter as a matrix.
+                        ConsumeToken(typeof(MatToken), optional: true);
+
+                        if (NextTokenIs(out Token argNameToken,typeof(IdentifierToken))) {
+                            args.Add(argNameToken.Text);
+                        }
+                        else
+                        {
+                            _parseErrors.ReportError(PeekNextToken(), "Parameter name missing or invalid.");
+                        }
+
+                    } while (NextTokenIs(typeof(CommaToken)));
+                }
+
+                if (!NextTokenIs(typeof(RParenToken))){
+                    _parseErrors.ReportError(PeekNextToken(), "Right parentheses is required.");
                 }
             }
 
-            ConsumeToken(typeof(NewLineToken));
-            return new OiProgram(programType, progName.Text, args);
+            if (!NextTokenIs(typeof(NewLineToken))){
+                _parseErrors.ReportError(PeekNextToken(),"Program delaration must end in a new line");
+            }
+            return new OiProgram(programType, programName, args);
         }
 
         public List<Statement> ParseStmts(Func<bool> stop, bool inLoop = false)
@@ -381,7 +410,7 @@ namespace BasicPlusParser
             {
                 return new EmptyStatement();
             }
-            throw Error(GetLineNo(), $"{token.Text} is not a valid statement.");
+            throw Error(token, $"{token.Text} is not a the start of a valid statement.");
         }
 
         void ConsumeStatementSeparator()
@@ -402,7 +431,7 @@ namespace BasicPlusParser
                 return;
             }
 
-            throw Error(GetLineNo(), "Semicolon or newline expected after statement.");
+            throw Error(PeekNextToken(), "Semicolon or newline expected after statement.");
         }
 
         void AnnotateStmt(List<Statement> statements, int lineNo, int lineCol)
@@ -549,7 +578,7 @@ namespace BasicPlusParser
 
             if (!(hasElse || hasThen) && optional == false)
             {
-                throw Error(GetLineNo(), "Then or else block expected.");
+                throw Error(PeekNextToken(), "Then or else block expected.");
             }
 
             return (thenBlock, elseBlock);
@@ -702,6 +731,9 @@ namespace BasicPlusParser
 
             (List<Statement> thenBlock, List<Statement> elseBlock) = ParseThenElseBlock();
 
+            //int a
+            
+
             return new OpenStatement
             {
                 Else = elseBlock,
@@ -725,10 +757,12 @@ namespace BasicPlusParser
         Statement ParseGoToStmt()
         {
             Token label = ConsumeIdToken();
-            return new GoToStatement
+            GoToStatement stmt = new GoToStatement
             {
                 Label = new IdExpression(label.Text, IdentifierType.Label)
             };
+            _jumpStatements.Add(stmt);
+            return stmt;
         }
 
         Statement ParseLocateStmt()
@@ -796,7 +830,7 @@ namespace BasicPlusParser
             do
             {
                 Token label = ConsumeIdToken();
-                labels.Add(new IdExpression(label.Text));
+                labels.Add(new IdExpression(label.Text, IdentifierType.Label));
    
             } while (NextTokenIs(typeof(CommaToken)));
 
@@ -910,7 +944,7 @@ namespace BasicPlusParser
                 _equates.Add(var.Text.ToLower());
             } else
             {
-                _parseErrors.ReportError(GetLineNo(), $"The equate constat {var.Text} has already been defined.");
+                _parseErrors.ReportError(GetLineNo(), $"The equate constat {var.Text} has already been defined.", var.StartCol, var.EndCol);
             }
             return new EquStatemnet
             {
@@ -945,7 +979,7 @@ namespace BasicPlusParser
             Token matrix = ConsumeIdToken();
             if (!IsMatrix(matrix))
             {
-                _parseErrors.ReportError(GetLineNo(), $"The identifier {matrix.Text} must be dimensioned.");
+                _parseErrors.ReportError(matrix, $"The identifier {matrix.Text} must be dimensioned.");
             }
 
             Expression value = null;
@@ -956,7 +990,7 @@ namespace BasicPlusParser
                 Token otherMatrixToken = ConsumeIdToken();
                 if (!IsMatrix(otherMatrixToken))
                 {
-                    _parseErrors.ReportError(GetLineNo(), $"The identifier {otherMatrixToken.Text} must be dimensioned.");
+                    _parseErrors.ReportError(otherMatrixToken, $"The identifier {otherMatrixToken.Text} must be dimensioned.");
                 }
                 otherMatrix = new IdExpression(otherMatrixToken.Text, IdentifierType.Reference);
             }
@@ -1125,6 +1159,7 @@ namespace BasicPlusParser
         Statement ParseGosubStmt()
         {
             Token label = ConsumeIdToken();
+            //_jumpLabels.Add(label.Text.ToLower());
             return new GosubStatement
             {
                 Label = new IdExpression(label.Text, IdentifierType.Label)
@@ -1225,7 +1260,7 @@ namespace BasicPlusParser
             {
                 if (declarationRequired && !_subroutines.Contains(funcName.Text.ToLower()))
                 {
-                    _parseErrors.ReportError(GetLineNo(), $"{funcName.Text} must be declared as a subroutine.");
+                    _parseErrors.ReportError(funcName, $"{funcName.Text} must be declared as a subroutine.");
                 }
                 funcExpr = new FuncExpression { Function = new IdExpression(funcName.Text, IdentifierType.Function), Args = new() };
             }
@@ -1283,7 +1318,7 @@ namespace BasicPlusParser
                     _matricies.Add(matVar.Text.ToLower(), matrix);
                 } else
                 {
-                    _parseErrors.ReportError(GetLineNo(), $"The matrix {matVar.Text} has already been defined.");
+                    _parseErrors.ReportError(matVar, $"The matrix {matVar.Text} has already been defined.");
                 }
 
             } while (NextTokenIs(typeof(CommaToken)));
@@ -1824,7 +1859,7 @@ namespace BasicPlusParser
                     }
                     else
                     {
-                        throw Error(GetLineNo(), "Expression expected.");
+                        throw Error(token, "Expression expected.");
                     }
                 }
                 else if (token is IfToken)
@@ -1873,7 +1908,7 @@ namespace BasicPlusParser
             }
             else
             {
-                throw Error(GetLineNo(),"Expression expected.");
+                throw Error(token,"Expression expected.");
             }
 
             while (NextTokenIs(out Token optoken, typeof(LAngleBracketToken), typeof(LSqrBracketToken)))
@@ -1936,19 +1971,20 @@ namespace BasicPlusParser
                 return null;
             }
 
+
             int tokenPos = _nextTokenIndex - 1;
             List<Expression> indexes = new();
+    
             do
             {
                 indexes.Add(ParseExpr(inArray: true));
-
             } while (NextTokenIs(typeof(CommaToken)));
 
             if (PeekNextToken() is RAngleBracketToken)
             {
                 if (indexes.Count > 4)
                 {
-                    _parseErrors.ReportError(GetLineNo(), $"Array {token.Text} has more than 4 indexes.");
+                    _parseErrors.ReportError(token, $"Array {token.Text} has more than 4 indexes.");
                 }
                 _nextTokenIndex += 1;
                 return new AngleArrExpression { Indexes = indexes, Source = baseExpr };
@@ -1973,7 +2009,7 @@ namespace BasicPlusParser
 
             if (indexes.Count > 2)
             {
-                _parseErrors.ReportError(GetLineNo(), $"Array {token.Text} has more than 2 indexes.");
+                _parseErrors.ReportError(token, $"Array {token.Text} has more than 2 indexes.");
             }
 
             ConsumeToken(typeof(RSqrBracketToken));
@@ -1988,14 +2024,14 @@ namespace BasicPlusParser
                 {
                     if (!_functions.Contains(token.Text.ToLower()))
                     {
-                        _parseErrors.ReportError(GetLineNo(), $"{token.Text} must be declared as a function");
+                        _parseErrors.ReportError(token, $"{token.Text} must be declared as a function");
                     }
                 }
                 else
                 {
                     if (!_subroutines.Contains(token.Text.ToLower()))
                     {
-                        _parseErrors.ReportError(GetLineNo(), $"{token.Text} must be declared as a subroutine.");
+                        _parseErrors.ReportError(token, $"{token.Text} must be declared as a subroutine.");
                     }
                 }
             }
@@ -2014,7 +2050,7 @@ namespace BasicPlusParser
                     Token matrix = ConsumeIdToken();
                     if (!IsMatrix(matrix))
                     {
-                        _parseErrors.ReportError(GetLineNo(), $"The identifier {matrix.Text} must be dimensioned.");
+                        _parseErrors.ReportError(matrix, $"The identifier {matrix.Text} must be dimensioned.");
                     }
                     arg = new IdExpression(matrix.Text, IdentifierType.Reference);
                 } else
@@ -2060,7 +2096,7 @@ namespace BasicPlusParser
             {
                 return _tokens[_nextTokenIndex++];
             }
-            throw Error(GetLineNo(),"Unexpected end of program.");
+            throw Error(_tokens.Last(),"Unexpected end of program.");
         }
 
         bool NextTokenIs(out Token token, params Type[] validTokens)
@@ -2092,7 +2128,7 @@ namespace BasicPlusParser
                 {
                     errMsg = $"Expected {expected}";
                 }
-                throw Error(_nextToken.LineNo, errMsg);
+                throw Error(token, errMsg);
             }
             return _tokens[_nextTokenIndex++];
         }
@@ -2111,7 +2147,7 @@ namespace BasicPlusParser
                 {
                     errMsg = $"Expected {expected}";
                 }
-                throw Error(_nextToken.LineNo, errMsg);
+                throw Error(token, errMsg);
             }
             return _tokens[_nextTokenIndex++];
         }
@@ -2121,7 +2157,7 @@ namespace BasicPlusParser
             Token token = PeekNextToken();
             if (token.GetType() != typeof(IdentifierToken))
             {
-                _parseErrors.ReportError(_nextToken.LineNo, message);
+                _parseErrors.ReportError(token, message);
                 throw new ParseException();
             }
             return _tokens[_nextTokenIndex++];
@@ -2156,7 +2192,7 @@ namespace BasicPlusParser
 
         int GetLineCol()
         {
-            return PeekNextToken()?.Col ?? _tokens.Last().LineNo;
+            return PeekNextToken()?.StartCol ?? _tokens.Last().LineNo;
         }
 
         bool IsMatrix(Token token)
@@ -2164,10 +2200,25 @@ namespace BasicPlusParser
             return _matricies.ContainsKey(token.Text.ToLower());
         }
 
-        ParseException Error(int lineNo, string message)
+        /*ParseException Error(int lineNo, string message)
         {
             _parseErrors.ReportError(lineNo, message);
             return new ParseException();
+        }*/
+        ParseException Error(Token token, string message)
+        {
+            _parseErrors.ReportError(token, message);
+            return new ParseException();
+        }
+
+        public void CheckIfJumpLabelsAreDefined()
+        {
+            /*foreach (string label in _jumpLabels)
+            {
+                if (!_labels.ContainsKey(label)) {
+                    _parseErrors.ReportError("")
+                }
+            }*/
         }
     }
 }

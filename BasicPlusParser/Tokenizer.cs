@@ -14,25 +14,31 @@ namespace BasicPlusParser
         readonly ParseErrors _tokenErrors;
         int _col;
         int _lineNo = 1;
+        TokenizerOptions _options;
 
-        public Tokenizer(string text, ParseErrors error)
+        public Tokenizer(string text, ParseErrors error = null, TokenizerOptions opts = null)
         {
-            _tokenErrors = error;
+            _tokenErrors = error ?? new ParseErrors();
             _source = text;
+            _options = opts ?? new TokenizerOptions();
+
         }
 
         public List<Token> Tokenise()
         {
             while (!IsAtEnd())
             {
-                int start = _pos;
+                int startPos = _pos;
                 int startLineNo = _lineNo;
-                Token matchedToken = GetNextToken(start);
+                int startCol = _col;
+                Token matchedToken = GetNextToken(_pos);
                 if (matchedToken != null)
                 {
                     matchedToken.LineNo = startLineNo;
-                    matchedToken.Pos = start;
-                    //matchedToken.Col = _col;
+                    matchedToken.Pos = startPos;
+                    matchedToken.StartCol = startCol;
+                    matchedToken.EndCol = _col;
+                    matchedToken.EndLineNo = _lineNo;
 
                     if (matchedToken is WhiteSpaceToken && (_prevToken is IfToken || _prevToken is ReturnToken ||
                         _prevToken is WhileToken || _prevToken is UntilToken))
@@ -43,16 +49,29 @@ namespace BasicPlusParser
                         _prevToken.DisallowFunction = true;
                     }
 
-                    if (matchedToken is WhiteSpaceToken || matchedToken is CommentToken ||
-                        (matchedToken is NewLineToken && _prevToken is NewLineToken))
+                    if (matchedToken is WhiteSpaceToken)
                     {
-                        // We don't what junk white spaces, newlines and comments in the token list.
                         continue;
                     }
-                    _tokens.Add(matchedToken);
+                    else if (matchedToken is NewLineToken && _prevToken is NewLineToken)
+                    {
+                        continue;
+                    }
+                    else if (matchedToken is CommentToken && !_options.IncludeComments)
+                    { 
+                        continue;
+                    }
+                    else
+                    {
+                        _tokens.Add(matchedToken);
+                    }
                 }
             }
-            _tokens.Add(new EofToken { LineNo = _lineNo, Pos = _pos });
+
+            if (_options.IncludeEofToken)
+            {
+                _tokens.Add(new EofToken { LineNo = _lineNo, Pos = _pos });
+            }
             return _tokens;
         }
 
@@ -127,10 +146,10 @@ namespace BasicPlusParser
                     return ScanNumber();
                 case '\r':
                     Match('\n');
-                    _lineNo++;
+                    IncrementLineNo();
                     while (Match("\r\n"))
                     {
-                        _lineNo++;
+                        IncrementLineNo();
                     }
                     return new NewLineToken { Text = _source[start.._pos] };
                 case ' ':
@@ -148,7 +167,7 @@ namespace BasicPlusParser
                     }
                     else
                     {
-                        _tokenErrors.ReportError(_lineNo, $"Unmatched character: {_source[_pos]}");
+                        _tokenErrors.ReportError(_lineNo, $"Unmatched character.",_col,_col);
                         return null;
                     }
             }
@@ -174,7 +193,7 @@ namespace BasicPlusParser
 
         CommentToken ScanSingleLineComment()
         {
-            int start = _pos;
+            int start = _pos -1;
             while (Peek() != '\r' && !IsAtEnd())
             {
                 char chr = Advance();
@@ -184,22 +203,23 @@ namespace BasicPlusParser
 
         CommentToken ScanMultiLineComment()
         {
-            int start = _pos;
+            int start = _pos-2;
             while (!IsAtEnd())
             {
                 char chr = Advance();
-                if (chr == '\r') _lineNo++;
+                if (chr == '\r') IncrementLineNo();
                 if (chr == '*' && Match('/')) {
-                    return new CommentToken { Text = _source[start..(_pos - 2)] };
+                    return new CommentToken { Text = _source[start.._pos] };
                 }
             }
 
-            _tokenErrors.ReportError(_lineNo, "Multiline comment must be delimited with */");
+            _tokenErrors.ReportError(_lineNo, "Multiline comment must be delimited with */",_col,_col);
             return null;
         }
 
         StringToken ScanStringLiteral(char delim)
         {
+            int start = _pos - 1;
             List<char> chars = new();
             while (Peek() != delim && !IsAtEnd())
             {
@@ -211,27 +231,26 @@ namespace BasicPlusParser
                     {
                         chars.RemoveAt(chars.Count - 1);
                         Advance();
-                        _lineNo += 1;
+                        IncrementLineNo();
                         continue;
                     }
                     else
                     {
-                        _tokenErrors.ReportError(_lineNo, $"String must be terminated by {delim}.");
-                        return null;
+                        _tokenErrors.ReportError(_lineNo, $"String must be enclosed by {delim}.",_col,_col);
+                        break;
                     }
                 }
                 chars.Add(chr);
             }
 
-            if (IsAtEnd())
+            if (!Match(delim))
             {
-                _tokenErrors.ReportError(_lineNo, $"String must be terminated by {delim}.");
-                return null;
+                _tokenErrors.ReportError(_lineNo, $"String must be enclosed by {delim}.",_col,_col);
             }
 
-            // Eat the quote.
-            Advance();
-            return new StringToken { Text = new String(chars.ToArray()), Delim = delim };
+
+            string str = new String(chars.ToArray());
+            return new StringToken { Str = str, Delim = delim , Text = _source[start.._pos]};
         }
 
         Token ScanIdentifierOrKeyword()
@@ -366,7 +385,7 @@ namespace BasicPlusParser
                         dotAllowed = false;
                     } else
                     {
-                        _tokenErrors.ReportError(_lineNo, "Number contains more than 1 decimal point.");
+                        _tokenErrors.ReportError(_lineNo, "Number contains more than 1 decimal point.",_col,_col);
                         return null;
                     }
                 } else
@@ -381,7 +400,7 @@ namespace BasicPlusParser
 
             if (_source[start] == '\\' && !Match('\\'))
             {
-                _tokenErrors.ReportError(_lineNo, "Number must end in \\");
+                _tokenErrors.ReportError(_lineNo, "Number must end in \\",_col,_col);
                 return null;
             }
 
@@ -389,7 +408,7 @@ namespace BasicPlusParser
 
             if (number.Last() == '.')
             {
-                _tokenErrors.ReportError(_lineNo, "Invalid decimal point.");
+                _tokenErrors.ReportError(_lineNo, "Invalid decimal point.",_col,_col);
                 return null;
             }
 
@@ -406,13 +425,15 @@ namespace BasicPlusParser
             if (IsAtEnd()) return false;
             if (_source[_pos] != expected) return false;
 
-            _pos++;
+            IncrementPos();
             return true;
         }
 
         char Advance()
         {
-            return _source[_pos++];
+            char c = _source[_pos];
+            IncrementPos();
+            return c;
         }
 
         bool Match(string expected)
@@ -420,7 +441,7 @@ namespace BasicPlusParser
             if (IsAtEnd()) return false;
             if (_source.Substring(_pos).StartsWith(expected, StringComparison.OrdinalIgnoreCase))
             {
-                _pos += expected.Length;
+                IncrementPos(expected.Length);
                 return true;
             }
             return false;
@@ -430,6 +451,19 @@ namespace BasicPlusParser
         {
             if (_pos >= _source.Length) return '\0';
             return _source[_pos];
+        }
+
+        void IncrementLineNo()
+        {
+            _lineNo++;
+            _col = 0;
+        }
+
+        int IncrementPos(int amount = 1)
+        {
+            _pos += amount;
+            _col += amount;
+            return _pos;
         }
     }
 }

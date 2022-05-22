@@ -10,5 +10,7 @@ namespace BasicPlusParser.Tokens
     {
         public string Str { get; set; }
         public char Delim { get; set; }
+
+        public override string LsClass { get; set; } =  "string";
     }
 }

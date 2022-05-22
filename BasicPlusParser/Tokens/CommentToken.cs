@@ -8,5 +8,6 @@ namespace BasicPlusParser.Tokens
 {
     class CommentToken : Token
     {
+        public override string LsClass { get; set; } = "comment";
     }
 }

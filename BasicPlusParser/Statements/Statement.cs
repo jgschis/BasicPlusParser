@@ -9,6 +9,7 @@ namespace BasicPlusParser
     {
         public int LineNo;
         public int LineCol;
+        public int EndCol;
       
         public virtual HashSet<string> GetAssignedVars()
         {
