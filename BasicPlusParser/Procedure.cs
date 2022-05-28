@@ -4,10 +4,10 @@ using System.Collections.Generic;
 
 namespace BasicPlusParser
 {
-    public class OiProgram
+    public class Procedure
     {
         public string Name;
-        public ProgramType PType;
+        public ProcedureType PType;
         public List<Statement> Statements = new();
         public List<string> Parameters;
         public Dictionary<string, Label> Labels = new();
@@ -18,8 +18,10 @@ namespace BasicPlusParser
         public HashSet<string> Equates = new();
 
 
-
-        public OiProgram(ProgramType pType, string name, List<string> args)
+        // If the file is empty, return a "blank" program.
+        public Procedure() { }
+        
+        public Procedure(ProcedureType pType, string name, List<string> args)
         {
             PType = pType;
             Name = name;

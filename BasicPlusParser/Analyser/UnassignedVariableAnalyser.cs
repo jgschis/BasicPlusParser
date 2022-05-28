@@ -5,7 +5,7 @@ namespace BasicPlusParser.Analyser
 {
     public class UnassignedVariableAnalyser
     {
-        OiProgram _prog;
+        Procedure _prog;
 
 
         public List<(string, Statement)> UnassignedVars = new();
@@ -14,7 +14,7 @@ namespace BasicPlusParser.Analyser
         readonly List<Statement> JumpsTaken = new();
       
         
-        public UnassignedVariableAnalyser(OiProgram prog)
+        public UnassignedVariableAnalyser(Procedure prog)
         {
             _prog = prog;
         }

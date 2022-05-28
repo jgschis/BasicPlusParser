@@ -18,7 +18,6 @@ namespace BasicPlusLangServer
 
         protected override SemanticTokensRegistrationOptions CreateRegistrationOptions(SemanticTokensCapability capability, ClientCapabilities clientCapabilities)
         {
-            Debugger.Break();
             return new SemanticTokensRegistrationOptions
             {
                 DocumentSelector = DocumentSelector.ForPattern(@"**/*.txt"),
@@ -42,8 +41,6 @@ namespace BasicPlusLangServer
 
         protected override Task Tokenize(SemanticTokensBuilder builder, ITextDocumentIdentifierParams identifier, CancellationToken cancellationToken)
         {
-
-            Debugger.Break();
             var doc = _documentManager.GetDocument(identifier.TextDocument.Uri.ToString());
             if (doc != null)
             {
@@ -69,9 +66,7 @@ namespace BasicPlusLangServer
                         }
 
                         builder.Push(new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(i-1, startCol, i-1, endCol), token.LsClass);
-
                     }
-
                 }
             }
 

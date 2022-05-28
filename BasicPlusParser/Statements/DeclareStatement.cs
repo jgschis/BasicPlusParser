@@ -10,6 +10,6 @@ namespace BasicPlusParser.Statements
     public class DeclareStatement : Statement
     {
         public List<IdExpression> Functions = new List<IdExpression>();
-        public ProgramType PType;
+        public ProcedureType PType;
     }
 }

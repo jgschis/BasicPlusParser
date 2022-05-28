@@ -12,5 +12,6 @@ namespace BasicPlusParser
         public int LineNo;
         public int StartCol;
         public int EndCol;
+        public int EndLineNo;
     }
 }

@@ -9,11 +9,16 @@ namespace BasicPlusLangServer{
 			.Enrich.FromLogContext()
 			.CreateLogger();
 
-			//System.Diagnostics.Debugger.Launch();
-			//while (!Debugger.IsAttached) {
-			//		
-			//	await Task.Delay(100);
-			//}
+
+			if (args.Length > 0 && args[0].ToLower() == "debug")
+			{
+				Debugger.Launch();
+				while (!Debugger.IsAttached)
+				{
+					await Task.Delay(100);
+				}
+			}
+
 			var langServerHost = new LanguageServerHost();
 			await langServerHost.Start();
 		}

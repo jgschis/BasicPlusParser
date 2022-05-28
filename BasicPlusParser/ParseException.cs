@@ -1,4 +1,5 @@
-﻿using System;
+﻿using BasicPlusParser.Tokens;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,20 +7,30 @@ using System.Threading.Tasks;
 
 namespace BasicPlusParser
 {
-    class ParseException : Exception
+    public class ParseException : Exception
     {
+        public Token Token;
         public ParseException()
         {
+         
         }
 
-        public ParseException(string message)
+        public ParseException(Token token, string message)
             : base(message)
         {
+            Token = token;
         }
 
         public ParseException(string message, Exception inner)
             : base(message, inner)
         {
+
+        }
+
+        public ParseException(Token token, string message, Exception inner)
+           : base(message, inner)
+        {
+            Token = token;
         }
 
     }

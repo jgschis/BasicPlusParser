@@ -16,20 +16,34 @@ namespace BasicPlusParser
                 LineNo = line,
                 Message =message,
                 StartCol = startCol,
-                EndCol = endCol
+                EndCol = endCol,
+                EndLineNo = line
             });
             HasError = true;
         }
 
         public void ReportError(Token token, string message)
         {
+
+
+            int endCol = token.EndCol;
+            int endLineNo = token.EndLineNo;
+
+            if (token is NewLineToken)
+            {
+                // If the token is a new line token, then we don't want to span multiple new lines...
+                endCol = int.MaxValue;
+                endLineNo = token.LineNo;
+            }
+
             Errors.Add(new ParseError
             {
                 LineNo = token.LineNo,
                 Message = message,
                 StartCol = token.StartCol,
-                EndCol = token.EndCol
-            });
+                EndCol = endCol,
+                EndLineNo = endLineNo
+            }); 
             HasError = true;
         }
     }

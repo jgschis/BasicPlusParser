@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 
 namespace BasicPlusParser.Tokens
 {
-    public class PragmaToken : KeywordToken
+    public class PragmaToken : Token
     {
-        
+        public override string LsClass { get; set; } = "keyword";
     }
 }

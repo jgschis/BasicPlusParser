@@ -6,9 +6,9 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using MediatR;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using System.Text.RegularExpressions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using BasicPlusParser;
+using BasicPlusParser.Analyser;
 
 namespace BasicPlusLangServer
 {
@@ -31,9 +31,6 @@ namespace BasicPlusLangServer
         }
 
          public override Task<Unit> Handle(DidChangeTextDocumentParams request, CancellationToken token){
-
-            Debugger.Break();
-      
             var documentPath = request.TextDocument.Uri.ToString();
             var text = request.ContentChanges.FirstOrDefault()?.Text??"";
 
@@ -79,21 +76,38 @@ namespace BasicPlusLangServer
         void ValidateDocument(TextDocument textDocument)
         {
             Parser parser = new Parser(textDocument.Text);
-            OiProgram program = parser.Parse();
-
+            Procedure program = parser.Parse();
+            UnreachableCodeAnalyser uca = new(program);
+            uca.Analyse();
+            
             List<Diagnostic> diagnoistics = new();
             foreach (var error in program.Errors.Errors)
             {
                 Diagnostic diagnostic = new()
                 {
                     Severity = DiagnosticSeverity.Error,
-                    Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(error.LineNo - 1, error.StartCol, error.LineNo - 1, error.EndCol),
+                    Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(error.LineNo - 1, error.StartCol, error.EndLineNo - 1, error.EndCol),
                     Message = error.Message,
                     Source = "ex",
                     Code = "a"
                 };
                 diagnoistics.Add(diagnostic);
             }
+
+            foreach (var stmt in uca.UnreachableStatements)
+            {
+                Diagnostic diagnostic = new()
+                {
+                    Severity = DiagnosticSeverity.Warning,
+                    Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(stmt.LineNo - 1, stmt.LineCol, stmt.LineNo - 1, stmt.EndCol),
+                    Message = "Unreachable code detected.",
+                    Source = "ex",
+                    Code = "a"
+                };
+                diagnoistics.Add(diagnostic);
+            }
+
+
             _facade.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams
             {
                 Diagnostics = new Container<Diagnostic>(diagnoistics.ToArray()),

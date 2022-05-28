@@ -6,14 +6,14 @@ namespace BasicPlusParser.Analyser
     {
         const string START = "";
 
-        OiProgram _prog;
-        readonly List<string> UnreachableStatements = new();
+        Procedure _prog;
+        public readonly List<Statement> UnreachableStatements = new();
         string _currLabel = START;
         Dictionary<string, List<string>> _reachabilityGraph = new();
         HashSet<string> _reachableLabels = new();
 
 
-        public UnreachableCodeAnalyser(OiProgram prog)
+        public UnreachableCodeAnalyser(Procedure prog)
         {
             _prog = prog;
         }
@@ -71,10 +71,9 @@ namespace BasicPlusParser.Analyser
             return returnStatementSeen;
         }
     
-
         void AddUnreachableStatement(Statement s)
         {
-            UnreachableStatements.Add($"[{s.LineNo}]: {s}");
+            UnreachableStatements.Add(s);
         }
 
         void UpdateReachabilityGraph(string label)

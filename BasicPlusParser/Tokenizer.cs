@@ -7,13 +7,13 @@ namespace BasicPlusParser
 {
     public class Tokenizer
     {
-        int _pos = 0;
-        readonly List<Token> _tokens = new();
         readonly string _source;
+        int _pos = 0;
+        int _col = 0;
+        int _lineNo = 1;
+        readonly List<Token> _tokens = new();
         Token _prevToken => _tokens.Count > 0 ? _tokens.Last() : null;
         readonly ParseErrors _tokenErrors;
-        int _col;
-        int _lineNo = 1;
         TokenizerOptions _options;
 
         public Tokenizer(string text, ParseErrors error = null, TokenizerOptions opts = null)
@@ -70,7 +70,7 @@ namespace BasicPlusParser
 
             if (_options.IncludeEofToken)
             {
-                _tokens.Add(new EofToken { LineNo = _lineNo, Pos = _pos });
+                _tokens.Add(new EofToken { LineNo = _lineNo, Pos = _source.Length, StartCol = _col, EndCol = _col, EndLineNo = _lineNo });
             }
             return _tokens;
         }

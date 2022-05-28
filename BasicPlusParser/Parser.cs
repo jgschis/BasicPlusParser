@@ -4,6 +4,7 @@ using System.Linq;
 using BasicPlusParser.Tokens;
 using BasicPlusParser.Statements;
 using BasicPlusParser.Statements.Expressions;
+using System.Diagnostics;
 
 namespace BasicPlusParser
 {
@@ -29,56 +30,68 @@ namespace BasicPlusParser
             _tokens = tokenizer.Tokenise();
         }
 
-        public OiProgram Parse()
+        public Procedure Parse()
         {
-            OiProgram program = ParseProgramDeclaration();
-            program.Statements = ParseStmts(() => IsAtEnd());
-            program.Labels = _labels;
-            program.Errors = _parseErrors;
-            program.Matricies = _matricies;
-            program.Subroutines = _subroutines;
-            program.Equates = _equates;
-            program.Functions = _functions;
-            return program;
+            if (_tokens.Count == 1)
+            {
+                return new Procedure();
+            }
+
+            Procedure procedure = ParseProcedureDeclaration();
+            procedure.Statements = ParseStmts(() => IsAtEnd());
+            procedure.Labels = _labels;
+            procedure.Errors = _parseErrors;
+            procedure.Matricies = _matricies;
+            procedure.Subroutines = _subroutines;
+            procedure.Equates = _equates;
+            procedure.Functions = _functions;
+            return procedure;
         }
 
-        OiProgram ParseProgramDeclaration()
+        Procedure ParseProcedureDeclaration()
         {
             List<string> args = new();
-            ProgramType programType;
+            ProcedureType procedureType;
             ConsumeToken(typeof(CompileToken), optional: true);
 
-            if (!NextTokenIs(out Token progTypeToken, typeof(SubroutineToken), typeof(FunctionToken), typeof(InsertDeclarationToken))) {
-                _parseErrors.ReportError(GetLineNo(), "Program type missing. Must be either function, subroutine or insert.", 0, 0);
-                // Default to subroutine so we can continue parsing for more errors...
-                programType = ProgramType.Subroutine;
-
-            } else if (progTypeToken is FunctionToken)
-            {
-                programType = ProgramType.Function;
+            if (!NextTokenIs(out Token procedureTypeToken, typeof(SubroutineToken), typeof(FunctionToken), typeof(InsertDeclarationToken))) {
+                _parseErrors.ReportError(PeekNextToken(), "Procedure type missing. Must be either function, subroutine or insert.");
+                // Default procedure  to subroutine so we can continue parsing for more errors...
+                procedureType = ProcedureType.Subroutine;
             }
-            else if (progTypeToken is SubroutineToken)
+            else if (procedureTypeToken is FunctionToken)
             {
-                programType = ProgramType.Subroutine;
+                procedureType = ProcedureType.Function;
+            }
+            else if (procedureTypeToken is SubroutineToken)
+            {
+                procedureType = ProcedureType.Subroutine;
             }
             else
             {
-                programType = ProgramType.Insert;
+                procedureType = ProcedureType.Insert;
             }
 
-            string programName;
-            if (!NextTokenIs(out Token programNameToken, typeof(IdentifierToken))) {
-                _parseErrors.ReportError(PeekNextToken(), "The program requires a valid name.");
-                programName = "no_name";
-            } else { 
-                programName = programNameToken.Text;
+            string procedureName;
+            if (!NextTokenIs(out Token procedureNameToken, typeof(IdentifierToken))) {
+                _parseErrors.ReportError(PeekNextToken(), "Procedure name missing or invalid.");
+                procedureName = "";
+            } else {
+                procedureName = procedureNameToken.Text;
             }
-       
-            
-            if (programType == ProgramType.Function || programType == ProgramType.Subroutine)
+
+            if (new List<string> {"function","subroutie","insert" }.Contains(procedureName.ToLower())){
+                _parseErrors.ReportError(PeekNextToken(), "Procedure name is invalid.");
+            }
+
+            bool hasLeftParen = false;
+            if (procedureType == ProcedureType.Function || procedureType == ProcedureType.Subroutine)
             {
                 if (!NextTokenIs(typeof(LParenToken))){
-                    _parseErrors.ReportError(PeekNextToken(), "Left parentheses is required.");
+                    _parseErrors.ReportError(PeekNextToken(), "Left parentheses is missing.");
+                } else
+                {
+                    hasLeftParen = true;
                 }
 
                 if (PeekNextToken() is IdentifierToken || PeekNextToken() is MatToken)
@@ -100,14 +113,15 @@ namespace BasicPlusParser
                 }
 
                 if (!NextTokenIs(typeof(RParenToken))){
-                    _parseErrors.ReportError(PeekNextToken(), "Right parentheses is required.");
+                    // No need to report missing right paren, if the left paren isn't present...
+                    if (hasLeftParen) _parseErrors.ReportError(PeekNextToken(), "Right parentheses is missing.");
                 }
             }
 
             if (!NextTokenIs(typeof(NewLineToken))){
-                _parseErrors.ReportError(PeekNextToken(),"Program delaration must end in a new line");
+                _parseErrors.ReportError(PeekNextToken(),"Procedure delaration must end in a new line.");
             }
-            return new OiProgram(programType, programName, args);
+            return new Procedure(procedureType, procedureName, args);
         }
 
         public List<Statement> ParseStmts(Func<bool> stop, bool inLoop = false)
@@ -122,17 +136,16 @@ namespace BasicPlusParser
             {
                 try
                 {
-                    if (statements.Count >= 1) ConsumeStatementSeparator();
-
-                    if (stop(statements)) break;
-
                     int lineNo = GetLineNo();
                     int lineCol = GetLineCol();
                     statements.Add(ParseStmt(inLoop: inLoop));
                     AnnotateStmt(statements, lineNo, lineCol);
+                    if (stop(statements)) break;
+                    ConsumeStatementSeparator();
                 }
-                catch
+                catch (ParseException e)
                 {
+                    _parseErrors.ReportError(e.Token, e.Message);
                     Sync(stop, statements);
                 }
             }
@@ -141,6 +154,8 @@ namespace BasicPlusParser
 
         public Statement ParseStmt(bool inLoop = false)
         {
+            Debugger.Break();
+
             Token token = GetNextToken();
             if (token is IdentifierToken)
             {
@@ -188,11 +203,7 @@ namespace BasicPlusParser
                 else if (IsMatrix(token) && NextTokenIs(typeof(LParenToken)))
                 {
                     return ParseMatrixAssignmentStmt(token);
-                }
-                else if (token is IfToken)
-                {
-                    return ParseIfStmt();
-                }
+                }  
                 else if (token is BeginToken)
                 {
                     return ParseCaseStmt();
@@ -212,14 +223,6 @@ namespace BasicPlusParser
                 else if (token is GosubToken)
                 {
                     return ParseGosubStmt();
-                }
-                else if (inLoop == true && token is WhileToken)
-                {
-                    return ParseWhileStmt();
-                }
-                else if (inLoop == true && token is UntilToken)
-                {
-                    return ParseUntilStmt();
                 }
                 else if (token is EquToken)
                 {
@@ -410,6 +413,18 @@ namespace BasicPlusParser
             {
                 return new EmptyStatement();
             }
+            else if (token is IfToken)
+            {
+                return ParseIfStmt();
+            }
+            else if (inLoop == true && token is WhileToken)
+            {
+                return ParseWhileStmt();
+            }
+            else if (inLoop == true && token is UntilToken)
+            {
+                return ParseUntilStmt();
+            }
             throw Error(token, $"{token.Text} is not a the start of a valid statement.");
         }
 
@@ -431,7 +446,7 @@ namespace BasicPlusParser
                 return;
             }
 
-            throw Error(PeekNextToken(), "Semicolon or newline expected after statement.");
+            throw Error(_prevToken, "Semicolon or newline expected after statement.");
         }
 
         void AnnotateStmt(List<Statement> statements, int lineNo, int lineCol)
@@ -439,6 +454,7 @@ namespace BasicPlusParser
             Statement statement = statements.Last();
             statement.LineNo = lineNo;
             statement.LineCol = lineCol;
+            statement.EndCol = _prevToken.EndCol;
             switch (statement)
             {
                 case
@@ -451,9 +467,17 @@ namespace BasicPlusParser
         void Sync(Func<List<Statement>, bool> stop, List<Statement> statements)
         {
             // When an error occurs, lets start parsing again after the next new line or semicolon.
-            while (!stop(statements) && PeekNextToken() is not NewLineToken && PeekNextToken() is not SemiColonToken && PeekNextToken() is not EofToken)
+            while (!stop(statements) && _nextToken is not NewLineToken 
+                                     && _nextToken is not SemiColonToken 
+                                     && _nextToken is not EofToken 
+                                     && _prevToken is not NewLineToken)
             {
                 _nextTokenIndex += 1;
+            }
+
+            if (_nextToken is  NewLineToken || _nextToken is SemiColonToken)
+            {
+                _nextTokenIndex++;
             }
         }
 
@@ -541,6 +565,7 @@ namespace BasicPlusParser
 
         (List<Statement> thenBlock, List<Statement> elseBlock) ParseThenElseBlock(bool optional = false)
         {
+
             List<Statement> elseBlock = new();
             List<Statement> thenBlock = new();
             bool hasThen = false;
@@ -549,7 +574,7 @@ namespace BasicPlusParser
             if (NextTokenIs(typeof(ThenToken)))
             {
                 hasThen = true;
-                if (NextTokenIs(typeof(NewLineToken)))
+                if (NextTokenIs(typeof(NewLineToken)) || IsAtEnd())
                 {
                     thenBlock = ParseStmts(_ =>PeekNextToken() is EndToken || IsAtEnd());
                     ConsumeToken(typeof(EndToken));
@@ -691,22 +716,22 @@ namespace BasicPlusParser
         Statement ParseDeclareStmt()
         {
             List<IdExpression> functions = new();
-            ProgramType pType;
+            ProcedureType pType;
             Token token = ConsumeToken("Expected subroutine or function.", false, typeof(SubroutineToken), typeof(FunctionToken)); 
             if (token is SubroutineToken)
             {
-                pType = ProgramType.Subroutine;
+                pType = ProcedureType.Subroutine;
             } 
             else 
             {
-                pType = ProgramType.Function;
+                pType = ProcedureType.Function;
             }
 
             do
             {
                 Token func = ConsumeIdToken();
                 functions.Add(new IdExpression(func.Text, IdentifierType.Function));
-                if (pType == ProgramType.Subroutine)
+                if (pType == ProcedureType.Subroutine)
                 {
                     _subroutines.Add(func.Text.ToLower());
                 } else
@@ -853,13 +878,11 @@ namespace BasicPlusParser
 
         Statement ParseIfStmt()
         {
-            Expression cond = ParseExpr();
-
+            Expression condition = ParseExpr();
             (List<Statement> thenBlock, List<Statement> elseBlock) = ParseThenElseBlock();
-
             return new IfStatement
             {
-                Condition = cond,
+                Condition = condition,
                 Then = thenBlock,
                 Else = elseBlock
             };
@@ -869,8 +892,7 @@ namespace BasicPlusParser
         {
             Expression cond = ParseExpr();
             ConsumeToken(typeof(NewLineToken));
-            List<Statement> statements = 
-                ParseStmts(() => PeekNextToken() is  CaseToken || PeekNextToken() is EndToken);
+            List<Statement> statements = ParseStmts(() => _nextToken is  CaseToken || _nextToken is EndToken || _nextToken is EofToken);
             return new Case
             {
                 Condition = cond,
@@ -887,6 +909,7 @@ namespace BasicPlusParser
             {
                 cases.Add(ParseCase());
             }
+
             ConsumeToken(typeof(EndToken));
             ConsumeToken(typeof(CaseToken));
             return new CaseStmt
@@ -1547,7 +1570,7 @@ namespace BasicPlusParser
         {
             if (!IsProgramEnd())
             {
-                throw new InvalidOperationException("End statement used but the program is not done.");
+                throw Error(_prevToken, "End statement used but the program is not done.");
             }
 
             return new EndStatement();
@@ -1862,10 +1885,6 @@ namespace BasicPlusParser
                         throw Error(token, "Expression expected.");
                     }
                 }
-                else if (token is IfToken)
-                {
-                    expr = ParseIfExpression(token);
-                }
                 else
                 {
                     expr = new IdExpression(token.Text, IdentifierType.Reference);
@@ -1905,6 +1924,10 @@ namespace BasicPlusParser
             else if (token is LSqrBracketToken)
             {
                 expr = ParseArrayInitExpression(token);
+            }
+            else if (token is IfToken)
+            {
+                expr = ParseIfExpression(token);
             }
             else
             {
@@ -1955,9 +1978,16 @@ namespace BasicPlusParser
             {
                 thenBlock = ParseExpr();
             }
+            else
+            {
+                _parseErrors.ReportError(PeekNextToken(), "then statement is required.");
+            }
             if (NextTokenIs(typeof(ElseToken)))
             {
                 elseBlock = ParseExpr();
+            } else
+            {
+                _parseErrors.ReportError(PeekNextToken(), "else statement is required.");
             }
             return new IfExpression { Then = thenBlock, Condition = cond, Else = elseBlock };
         }
@@ -2157,8 +2187,8 @@ namespace BasicPlusParser
             Token token = PeekNextToken();
             if (token.GetType() != typeof(IdentifierToken))
             {
-                _parseErrors.ReportError(token, message);
-                throw new ParseException();
+                //_parseErrors.ReportError(token, message);
+                throw Error(token, message);
             }
             return _tokens[_nextTokenIndex++];
         }
@@ -2207,8 +2237,8 @@ namespace BasicPlusParser
         }*/
         ParseException Error(Token token, string message)
         {
-            _parseErrors.ReportError(token, message);
-            return new ParseException();
+            //_parseErrors.ReportError(token, message);
+            return new ParseException(token, message);
         }
 
         public void CheckIfJumpLabelsAreDefined()

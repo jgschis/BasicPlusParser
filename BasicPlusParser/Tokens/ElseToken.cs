@@ -6,7 +6,9 @@ using System.Threading.Tasks;
 
 namespace BasicPlusParser.Tokens
 {
-    public class ElseToken : KeywordToken
+    public class ElseToken : Token
     {
+        public override string LsClass { get; set; } = "keyword";
+
     }
 }
