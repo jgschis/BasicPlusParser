@@ -6,11 +6,11 @@ namespace BasicPlusParser.Analyser
     {
         const string START = "";
 
-        Procedure _prog;
+        readonly Procedure _prog;
         public readonly List<Statement> UnreachableStatements = new();
         string _currLabel = START;
-        Dictionary<string, List<string>> _reachabilityGraph = new();
-        HashSet<string> _reachableLabels = new();
+        readonly Dictionary<string, List<string>> _reachabilityGraph = new();
+        readonly HashSet<string> _reachableLabels = new();
 
 
         public UnreachableCodeAnalyser(Procedure prog)
@@ -18,57 +18,53 @@ namespace BasicPlusParser.Analyser
             _prog = prog;
         }
 
-         bool AnalyseCore(List<Statement> statements)
+         bool AnalyseBlock(List<Statement> statements)
         {
-            bool returnStatementSeen = false;
-            bool gotoStatementSeen = false;
+            bool blockReturns = false;
+
             foreach (Statement statement in statements)
             {
-                bool statementNotReachable = statement is not InternalSubStatement && (returnStatementSeen || gotoStatementSeen);
-                if (statementNotReachable)
+                bool statementReachable =  !blockReturns;
+
+                if (!statementReachable && statement is not InternalSubStatement)
                 {
                     AddUnreachableStatement(statement);
                 }
-
-                bool childrenReturn = false;
                 switch (statement)
                 {
                     case ReturnStatement:
-                        returnStatementSeen = true;
+                        blockReturns = true;
                         break;
                     case InternalSubStatement s:
-                        if (!(returnStatementSeen || gotoStatementSeen)) UpdateReachabilityGraph(s.Label.Name);
+                        if (!blockReturns) UpdateReachabilityGraph(s.Label.Name);
                         _currLabel = s.Label.Name;
-                        returnStatementSeen = false;
-                        gotoStatementSeen = false;
+                        blockReturns = false;
                         break;
                     case GoToStatement s:
-                        if (!statementNotReachable) UpdateReachabilityGraph(s.Label.Name);
-                        gotoStatementSeen = true;
+                        if (statementReachable) UpdateReachabilityGraph(s.Label.Name);
+                        blockReturns = true;
                         break;
                     case GosubStatement s:
-                        if (!statementNotReachable) UpdateReachabilityGraph(s.Label.Name);
+                        if (statementReachable) UpdateReachabilityGraph(s.Label.Name);
                         break;
                     case ThenElseStatement s:
-                        childrenReturn = true && AnalyseCore(s.Then);
-                        childrenReturn &= AnalyseCore(s.Else);
+                        blockReturns = AnalyseBlock(s.Then) && AnalyseBlock(s.Else);
                         break;
                     case ForNextStatement s:
-                        childrenReturn = true && AnalyseCore(s.Statements);
+                        blockReturns = AnalyseBlock(s.Statements);
                         break;
                     case LoopRepeatStatement s:
-                        childrenReturn = true && AnalyseCore(s.Statements);
+                        blockReturns = AnalyseBlock(s.Statements);
                         break;
                     case CaseStmt s:
                         foreach (Case @case in s.Cases)
                         {
-                            AnalyseCore(@case.Statements);
+                            AnalyseBlock(@case.Statements);
                         }
                         break;                      
                 }
-                returnStatementSeen |= childrenReturn;
             }
-            return returnStatementSeen;
+            return blockReturns;
         }
     
         void AddUnreachableStatement(Statement s)
@@ -112,7 +108,7 @@ namespace BasicPlusParser.Analyser
            {
                 _reachabilityGraph[lbl.Key] = new();
            }
-            AnalyseCore(_prog.Statements);
+            AnalyseBlock(_prog.Statements);
             AnalyseReachabilityGraph();
         }
     }
