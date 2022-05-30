@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace BasicPlusParser.Analyser
 {
@@ -19,14 +20,15 @@ namespace BasicPlusParser.Analyser
         }
 
          bool AnalyseBlock(List<Statement> statements)
-        {
+        {  
+            
+            // Does the block we are currently analysing unconditionally return?
+            // If so, every subsequent statement is unreachable.
             bool blockReturns = false;
 
             foreach (Statement statement in statements)
             {
-                bool statementReachable =  !blockReturns;
-
-                if (!statementReachable && statement is not InternalSubStatement)
+                if (blockReturns && statement is not InternalSubStatement)
                 {
                     AddUnreachableStatement(statement);
                 }
@@ -41,20 +43,22 @@ namespace BasicPlusParser.Analyser
                         blockReturns = false;
                         break;
                     case GoToStatement s:
-                        if (statementReachable) UpdateReachabilityGraph(s.Label.Name);
+                        if (!blockReturns) UpdateReachabilityGraph(s.Label.Name);
                         blockReturns = true;
                         break;
                     case GosubStatement s:
-                        if (statementReachable) UpdateReachabilityGraph(s.Label.Name);
+                        if (!blockReturns) UpdateReachabilityGraph(s.Label.Name);
                         break;
                     case ThenElseStatement s:
-                        blockReturns = AnalyseBlock(s.Then) && AnalyseBlock(s.Else);
+                        bool thenReturns = AnalyseBlock(s.Then);
+                        bool elseReturns = AnalyseBlock(s.Else);
+                        blockReturns = thenReturns && elseReturns;
                         break;
                     case ForNextStatement s:
-                        blockReturns = AnalyseBlock(s.Statements);
+                        blockReturns |= AnalyseBlock(s.Statements);
                         break;
                     case LoopRepeatStatement s:
-                        blockReturns = AnalyseBlock(s.Statements);
+                        blockReturns |= AnalyseBlock(s.Statements);
                         break;
                     case CaseStmt s:
                         foreach (Case @case in s.Cases)

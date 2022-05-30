@@ -154,7 +154,6 @@ namespace BasicPlusParser
 
         public Statement ParseStmt(bool inLoop = false)
         {
-            Debugger.Break();
 
             Token token = GetNextToken();
             if (token is IdentifierToken)
