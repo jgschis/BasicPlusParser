@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Diagnostics;
 
 namespace BasicPlusParser.Analyser
 {
@@ -9,6 +8,7 @@ namespace BasicPlusParser.Analyser
 
         readonly Procedure _prog;
         public readonly List<Statement> UnreachableStatements = new();
+        public readonly List<Statement> UnreachableLabels = new();
         string _currLabel = START;
         readonly Dictionary<string, List<string>> _reachabilityGraph = new();
         readonly HashSet<string> _reachableLabels = new();
@@ -78,17 +78,21 @@ namespace BasicPlusParser.Analyser
 
         void UpdateReachabilityGraph(string label)
         {
-            _reachabilityGraph[_currLabel].Add(label);
+            if (_reachabilityGraph.ContainsKey(_currLabel)) {
+                _reachabilityGraph[_currLabel].Add(label);
+            }
         }
 
         void AnalyseReachabilityGraphCore(string label)
         {
-            foreach (string edgeLabel in _reachabilityGraph[label])
-            {
-                if (!_reachableLabels.Contains(edgeLabel))
+            if (_reachabilityGraph.ContainsKey(label)){
+                foreach (string edgeLabel in _reachabilityGraph[label])
                 {
-                    _reachableLabels.Add(edgeLabel);
-                    AnalyseReachabilityGraphCore(edgeLabel);
+                    if (!_reachableLabels.Contains(edgeLabel))
+                    {
+                        _reachableLabels.Add(edgeLabel);
+                        AnalyseReachabilityGraphCore(edgeLabel);
+                    }
                 }
             }
         }
@@ -100,7 +104,7 @@ namespace BasicPlusParser.Analyser
             {
                 if (!_reachableLabels.Contains(label.Key))
                 {
-                    AddUnreachableStatement(label.Value.LabelStmt);
+                    UnreachableLabels.Add(label.Value.LabelStmt);
                 }
             }
         }

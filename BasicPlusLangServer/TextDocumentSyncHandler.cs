@@ -4,7 +4,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using MediatR;
-using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using BasicPlusParser;
@@ -101,6 +100,19 @@ namespace BasicPlusLangServer
                     Severity = DiagnosticSeverity.Warning,
                     Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(stmt.LineNo - 1, stmt.LineCol, stmt.LineNo - 1, stmt.EndCol),
                     Message = "Unreachable code detected.",
+                    Source = "ex",
+                    Code = "a"
+                };
+                diagnoistics.Add(diagnostic);
+            }
+
+            foreach (var label in uca.UnreachableLabels)
+            {
+                Diagnostic diagnostic = new()
+                {
+                    Severity = DiagnosticSeverity.Warning,
+                    Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(label.LineNo - 1, label.LineCol, label.LineNo - 1, label.EndCol),
+                    Message = "Unreachable label detected.",
                     Source = "ex",
                     Code = "a"
                 };

@@ -4,7 +4,6 @@ using System.Linq;
 using BasicPlusParser.Tokens;
 using BasicPlusParser.Statements;
 using BasicPlusParser.Statements.Expressions;
-using System.Diagnostics;
 
 namespace BasicPlusParser
 {
