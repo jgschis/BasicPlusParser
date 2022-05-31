@@ -10,7 +10,8 @@ namespace BasicPlusParser
     public class Parser
     {
         int _nextTokenIndex = 0;
-        List<Token> _tokens = new();
+        public List<Token> _tokens;
+        public List<Token> _commentTokens;
         Token _nextToken => _nextTokenIndex < _tokens.Count ? _tokens[_nextTokenIndex] : null;
         Token _prevToken => _nextTokenIndex > 0 ? _tokens[_nextTokenIndex - 1] : null;
         Dictionary<string, Label> _labels = new();
@@ -26,7 +27,9 @@ namespace BasicPlusParser
         public Parser(string text)
         {
             Tokenizer tokenizer = new(text, _parseErrors);
-            _tokens = tokenizer.Tokenise();
+            var tokenizerOutput = tokenizer.Tokenise();
+            _tokens = tokenizerOutput.Tokens;
+            _commentTokens = tokenizerOutput.CommentTokens;
         }
 
         public Procedure Parse()
@@ -76,6 +79,7 @@ namespace BasicPlusParser
                 _parseErrors.ReportError(PeekNextToken(), "Procedure name missing or invalid.");
                 procedureName = "";
             } else {
+                procedureNameToken.LsClass = "function";
                 procedureName = procedureNameToken.Text;
             }
 
@@ -102,6 +106,7 @@ namespace BasicPlusParser
 
                         if (NextTokenIs(out Token argNameToken,typeof(IdentifierToken))) {
                             args.Add(argNameToken.Text);
+                            argNameToken.LsClass = "parameter";
                         }
                         else
                         {
@@ -137,7 +142,8 @@ namespace BasicPlusParser
                 {
                     int lineNo = GetLineNo();
                     int lineCol = GetLineCol();
-                    statements.Add(ParseStmt(inLoop: inLoop));
+                    Statement statement = ParseStmt(inLoop: inLoop);
+                    statements.Add(statement);
                     AnnotateStmt(statements, lineNo, lineCol);
                     if (stop(statements)) break;
                     ConsumeStatementSeparator();
@@ -153,6 +159,10 @@ namespace BasicPlusParser
 
         public Statement ParseStmt(bool inLoop = false)
         {
+            if (PeekNextToken() is SemiColonToken)
+            {
+                return new EmptyStatement();
+            }
 
             Token token = GetNextToken();
             if (token is IdentifierToken)
@@ -406,10 +416,6 @@ namespace BasicPlusParser
             else if (token is EndToken)
             {
                 return ParseEndStmt();
-            }
-            else if (token is SemiColonToken)
-            {
-                return new EmptyStatement();
             }
             else if (token is IfToken)
             {
@@ -728,6 +734,7 @@ namespace BasicPlusParser
             do
             {
                 Token func = ConsumeIdToken();
+                func.LsClass = "function";
                 functions.Add(new IdExpression(func.Text, IdentifierType.Function));
                 if (pType == ProcedureType.Subroutine)
                 {
@@ -889,7 +896,7 @@ namespace BasicPlusParser
         Case ParseCase()
         {
             Expression cond = ParseExpr();
-            ConsumeToken(typeof(NewLineToken));
+            ConsumeSemiColonsUntilEndOfLine();
             List<Statement> statements = ParseStmts(() => _nextToken is  CaseToken || _nextToken is EndToken || _nextToken is EofToken);
             return new Case
             {
@@ -901,7 +908,7 @@ namespace BasicPlusParser
         Statement ParseCaseStmt()
         {
             ConsumeToken(typeof(CaseToken));
-            ConsumeToken(typeof(NewLineToken));
+            ConsumeSemiColonsUntilEndOfLine();
             List<Case> cases = new();
             while (NextTokenIs(typeof(CaseToken)))
             {
@@ -976,6 +983,7 @@ namespace BasicPlusParser
 
         Statement ParseFunctionCallStmt(Token token)
         {
+            token.LsClass = "function";
             FuncExpression funcExpr = (FuncExpression) ParseFunc(token, mustReturnValue:false);
             return new FunctionCallStatement
             {
@@ -1169,7 +1177,8 @@ namespace BasicPlusParser
 
             //ExpectStatementEnd();
             //List<Statement> statements = ParseStmts(x => x.Count > 0 &&  x.Last() is ReturnStatement 
-           //     || PeekNextToken() is EofToken);   
+            //     || PeekNextToken() is EofToken);   
+            token.LsClass = "label";
             return new InternalSubStatement
             {
                 Label = new IdExpression(token.Text,IdentifierType.Label),
@@ -1274,6 +1283,7 @@ namespace BasicPlusParser
         {
             FuncExpression funcExpr;
             Token funcName = ConsumeIdToken();
+            funcName.LsClass = "method";
             bool declarationRequired = funcName.Text[0] != '@';
             if (NextTokenIs(typeof(LParenToken))){
                 funcExpr = (FuncExpression)ParseFunc(funcName, mustReturnValue: false, declarationRequired: declarationRequired);
@@ -2046,6 +2056,8 @@ namespace BasicPlusParser
 
         Expression ParseFunc(Token token, bool mustReturnValue = true, bool declarationRequired = true)
         {
+
+            token.LsClass = "function";
             if (declarationRequired)
             {
                 if (mustReturnValue)
@@ -2226,6 +2238,15 @@ namespace BasicPlusParser
         bool IsMatrix(Token token)
         {
             return _matricies.ContainsKey(token.Text.ToLower());
+        }
+
+        void ConsumeSemiColonsUntilEndOfLine()
+        {
+            while (NextTokenIs(typeof(SemiColonToken)));
+            if (!NextTokenIs(typeof(NewLineToken)))
+            {
+                throw Error(_nextToken, "New Line expected.");
+            }
         }
 
         /*ParseException Error(int lineNo, string message)

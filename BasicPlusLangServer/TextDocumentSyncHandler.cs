@@ -78,7 +78,7 @@ namespace BasicPlusLangServer
             Procedure program = parser.Parse();
             UnreachableCodeAnalyser uca = new(program);
             uca.Analyse();
-            
+
             List<Diagnostic> diagnoistics = new();
             foreach (var error in program.Errors.Errors)
             {

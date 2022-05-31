@@ -11,20 +11,18 @@ namespace BasicPlusParser
         int _pos = 0;
         int _col = 0;
         int _lineNo = 1;
-        readonly List<Token> _tokens = new();
+        List<Token> _tokens = new();
+        List<Token> _commentTokens = new();
         Token _prevToken => _tokens.Count > 0 ? _tokens.Last() : null;
         readonly ParseErrors _tokenErrors;
-        TokenizerOptions _options;
 
-        public Tokenizer(string text, ParseErrors error = null, TokenizerOptions opts = null)
+        public Tokenizer(string text, ParseErrors error = null)
         {
             _tokenErrors = error ?? new ParseErrors();
             _source = text;
-            _options = opts ?? new TokenizerOptions();
-
         }
 
-        public List<Token> Tokenise()
+        public TokenizerOutput Tokenise()
         {
             while (!IsAtEnd())
             {
@@ -43,7 +41,7 @@ namespace BasicPlusParser
                     if (matchedToken is WhiteSpaceToken && (_prevToken is IfToken || _prevToken is ReturnToken ||
                         _prevToken is WhileToken || _prevToken is UntilToken))
                     {
-                        // Basic + allows keywords to be function names.
+                        // Basic + allows some keywords to be function names.
                         // However, if the keyword is followed by space,
                         // it does not allow the keyword to be a function name.
                         _prevToken.DisallowFunction = true;
@@ -57,9 +55,9 @@ namespace BasicPlusParser
                     {
                         continue;
                     }
-                    else if (matchedToken is CommentToken && !_options.IncludeComments)
-                    { 
-                        continue;
+                    else if (matchedToken is CommentToken)
+                    {
+                        _commentTokens.Add(matchedToken);
                     }
                     else
                     {
@@ -67,12 +65,14 @@ namespace BasicPlusParser
                     }
                 }
             }
-
-            if (_options.IncludeEofToken)
+       
+            _tokens.Add(new EofToken { LineNo = _lineNo, Pos = _source.Length, StartCol = _col, EndCol = _col, EndLineNo = _lineNo });
+            
+            return new TokenizerOutput
             {
-                _tokens.Add(new EofToken { LineNo = _lineNo, Pos = _source.Length, StartCol = _col, EndCol = _col, EndLineNo = _lineNo });
-            }
-            return _tokens;
+                Tokens = _tokens,
+                CommentTokens = _commentTokens
+            };
         }
 
         public Token GetNextToken(int start)
@@ -101,9 +101,9 @@ namespace BasicPlusParser
                     else if (Match("=")) return new MinusEqualToken { Text = "-=" };
                     else return new MinusToken { Text = character.ToString() };
                 case '/':
-                    if (Match("//")) return new MultiValueDivToken { Text = "///" };
+                    if (StartOfStmt() && Match("/")) return ScanSingleLineComment();
+                    else if (Match("//")) return new MultiValueDivToken { Text = "///" };
                     else if (Match("=")) return new SlashEqualToken { Text = "/=" };
-                    else if (StartOfStmt() && Match("/")) return ScanSingleLineComment();
                     else if (Match("*")) return ScanMultiLineComment();
                     else return new SlashToken { Text = character.ToString() };
                 case '*':

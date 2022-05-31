@@ -1,8 +1,10 @@
 ﻿using BasicPlusParser;
+using BasicPlusParser.Tokens;
 using MediatR;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using System.Linq;
 
 namespace BasicPlusLangServer
 {
@@ -43,33 +45,70 @@ namespace BasicPlusLangServer
             var doc = _documentManager.GetDocument(identifier.TextDocument.Uri.ToString());
             if (doc != null)
             {
-                var tokenizer = new Tokenizer(doc.Text, opts:new TokenizerOptions { IncludeComments = true,  IncludeEofToken = false});
-                var tokens = tokenizer.Tokenise();
 
-                foreach (var token in tokens)
+                Parser parser = new Parser(doc.Text);
+                parser.Parse();
+
+                // Unfortunately the highligting of tokens must be applied in the order in which the tokens appear.
+                // That means we need to merge the two token lists together.
+                int i = 0;
+                int j = 0;
+                while (true)
                 {
-                    for (int i = token.LineNo; i <= token.EndLineNo; i++)
+                    if (i < parser._tokens.Count && j < parser._commentTokens.Count)
                     {
-
-                        int startCol = token.StartCol;
-                        int endCol = token.EndCol;
-
-                        if (i > token.LineNo)
+                        if (parser._tokens[i].Pos < parser._commentTokens[j].Pos)
                         {
-                            startCol = 0;
+                            ApplyHighlightingToToken(parser._tokens[i++], builder);
                         }
-
-                        if (i < token.EndLineNo)
+                        else
                         {
-                            endCol = int.MaxValue;
+                            ApplyHighlightingToToken(parser._commentTokens[j++], builder);
                         }
-
-                        builder.Push(new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(i-1, startCol, i-1, endCol), token.LsClass);
+                    } 
+                    else if (i < parser._tokens.Count)
+                    {
+                        ApplyHighlightingToToken(parser._tokens[i++], builder);
+                    }
+                    else if (j < parser._commentTokens.Count)
+                    {
+                        ApplyHighlightingToToken(parser._commentTokens[j++], builder);
+                    }
+                    else
+                    {
+                        break;
                     }
                 }
+               
             }
-
             return Unit.Task;
         }
+
+
+        void ApplyHighlightingToToken(Token token, SemanticTokensBuilder builder)
+        {
+
+            if (token is EofToken) return;
+
+            for (int i = token.LineNo; i <= token.EndLineNo; i++)
+            {
+
+                int startCol = token.StartCol;
+                int endCol = token.EndCol;
+
+                if (i > token.LineNo)
+                {
+                    startCol = 0;
+                }
+
+                if (i < token.EndLineNo)
+                {
+                    endCol = int.MaxValue;
+                }
+
+                builder.Push(new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(i - 1, startCol, i - 1, endCol), token.LsClass);
+            }
+        }
+
     }
 }
