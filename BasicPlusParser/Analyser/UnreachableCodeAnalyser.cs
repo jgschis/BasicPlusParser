@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using BasicPlusParser.Statements;
+using System.Collections.Generic;
 
 namespace BasicPlusParser.Analyser
 {
@@ -65,7 +66,14 @@ namespace BasicPlusParser.Analyser
                         {
                             AnalyseBlock(@case.Statements);
                         }
-                        break;                      
+                        break;
+                    case OnGosubStatement s:
+                        if (!blockReturns) s.Labels.ForEach( label => UpdateReachabilityGraph(label.Name));
+                        break;
+                    case OnGotoStatement s:
+                        if (!blockReturns) s.Labels.ForEach(label => UpdateReachabilityGraph(label.Name));
+                        blockReturns = true;
+                        break;
                 }
             }
             return blockReturns;

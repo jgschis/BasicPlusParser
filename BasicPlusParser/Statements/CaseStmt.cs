@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-using BasicPlusParser.Statements.Expressions;
+﻿using System.Collections.Generic;
 
-namespace BasicPlusParser
+namespace BasicPlusParser.Statements
 {
     public class CaseStmt : Statement
     {
