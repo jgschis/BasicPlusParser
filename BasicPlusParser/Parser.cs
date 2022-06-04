@@ -12,7 +12,7 @@ namespace BasicPlusParser
         int _nextTokenIndex = 0;
         public List<Token> _tokens;
         public List<Token> _commentTokens;
-        Token _nextToken => _nextTokenIndex < _tokens.Count ? _tokens[_nextTokenIndex] : null;
+        Token _nextToken => _nextTokenIndex < _tokens.Count ? _tokens[_nextTokenIndex] : _tokens.Last();
         Token _prevToken => _nextTokenIndex > 0 ? _tokens[_nextTokenIndex - 1] : null;
         Dictionary<string, Label> _labels = new();
         Dictionary<string, Matrix> _matricies = new();
@@ -136,7 +136,7 @@ namespace BasicPlusParser
         public List<Statement> ParseStmts(Func<List<Statement>, bool> stop, bool inLoop = false)
         {
             List<Statement> statements = new();
-            while (!stop(statements))
+            while (!stop(statements) && !IsAtEnd())
             {
                 try
                 {
@@ -569,7 +569,6 @@ namespace BasicPlusParser
 
         (List<Statement> thenBlock, List<Statement> elseBlock) ParseThenElseBlock(bool optional = false)
         {
-
             List<Statement> elseBlock = new();
             List<Statement> thenBlock = new();
             bool hasThen = false;
@@ -578,30 +577,36 @@ namespace BasicPlusParser
             if (NextTokenIs(typeof(ThenToken)))
             {
                 hasThen = true;
-                if (NextTokenIs(typeof(NewLineToken)) || IsAtEnd())
+                if (NextTokenIs(typeof(NewLineToken)))
                 {
-                    thenBlock = ParseStmts(_ =>PeekNextToken() is EndToken || IsAtEnd());
+                    thenBlock = ParseStmts(_ =>PeekNextToken() is EndToken);
                     ConsumeToken(typeof(EndToken));
                 }
                 else
                 {
-                    thenBlock = ParseStmts(_ => PeekNextToken() is ElseToken || PeekNextToken() is NewLineToken
-                        || IsAtEnd() || (PeekNextToken() is SemiColonToken && PeekNextToken(1) is NewLineToken));
+                    thenBlock = ParseStmts(_ => PeekNextToken() is ElseToken || PeekNextToken() is NewLineToken || IsAtEnd());
+                    if (thenBlock.All(s => s is EmptyStatement) || thenBlock.Count == 0)
+                    {
+                        _parseErrors.ReportError(_nextToken, "then block requires at least 1 statement.");
+                    }
                 }
             }
 
             if (NextTokenIs(typeof(ElseToken)))
             {
                 hasElse = true;
-                if (NextTokenIs(typeof(NewLineToken)) || IsAtEnd())
+                if (NextTokenIs(typeof(NewLineToken)))
                 {
-                    elseBlock = ParseStmts(() => PeekNextToken() is EndToken || IsAtEnd());
+                    elseBlock = ParseStmts(() => PeekNextToken() is EndToken);
                     ConsumeToken(typeof(EndToken));
                 }
                 else
                 {
-                    elseBlock = ParseStmts(() => PeekNextToken() is NewLineToken || IsAtEnd() ||
-                        (PeekNextToken() is SemiColonToken && PeekNextToken(1) is NewLineToken));
+                    elseBlock = ParseStmts(() => PeekNextToken() is NewLineToken || IsAtEnd());
+                    if (elseBlock.All(s => s is EmptyStatement) || elseBlock.Count == 0)
+                    {
+                        _parseErrors.ReportError(_nextToken, "else block block requires at least 1 statement.");
+                    }
                 }
             }
 
