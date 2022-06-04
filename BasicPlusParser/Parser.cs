@@ -465,7 +465,7 @@ namespace BasicPlusParser
             {
                 case
                     InternalSubStatement s:
-                    _labels.Add(s.Label.Name, new Label(statements.Count, statements));
+                    _labels.TryAdd(s.Label.Name, new Label(statements.Count, statements));
                     break;
             }
         }
@@ -1197,6 +1197,12 @@ namespace BasicPlusParser
             //ExpectStatementEnd();
             //List<Statement> statements = ParseStmts(x => x.Count > 0 &&  x.Last() is ReturnStatement 
             //     || PeekNextToken() is EofToken);   
+
+
+            if (_labels.ContainsKey(token.Text.ToLower())){
+                _parseErrors.ReportError(token, $"The label {token.Text} has already been defined.");
+            }
+
             token.LsClass = "label";
             return new InternalSubStatement
             {
