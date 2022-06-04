@@ -215,7 +215,7 @@ namespace BasicPlusParser
                 }  
                 else if (token is BeginToken)
                 {
-                    return ParseCaseStmt();
+                    return ParseCaseStmt(token);
                 }
                 else if (token is ReturnToken)
                 {
@@ -583,7 +583,7 @@ namespace BasicPlusParser
                     thenBlock = ParseStmts(_ =>PeekNextToken() is EndToken);
                     Token endToken = ConsumeToken(typeof(EndToken));
 
-                    Regions.Add(new Region(thenToken.LineNo,thenToken.StartCol, endToken.LineNo, endToken.EndCol));
+                    Regions.Add(new Region(thenToken.LineNo,thenToken.EndCol, endToken.LineNo, endToken.EndCol));
                 }
                 else
                 {
@@ -602,7 +602,7 @@ namespace BasicPlusParser
                 {
                     elseBlock = ParseStmts(() => PeekNextToken() is EndToken);
                     Token endToken = ConsumeToken(typeof(EndToken));
-                    Regions.Add(new Region(elseToken.LineNo, elseToken.StartCol, endToken.LineNo, endToken.EndCol));
+                    Regions.Add(new Region(elseToken.LineNo, elseToken.EndCol, endToken.LineNo, endToken.EndCol));
                 }
                 else 
                 {     
@@ -914,7 +914,7 @@ namespace BasicPlusParser
             };
         }
 
-        Statement ParseCaseStmt()
+        Statement ParseCaseStmt(Token token)
         {
             ConsumeToken(typeof(CaseToken));
             ConsumeSemiColonsUntilEndOfLine();
@@ -926,6 +926,8 @@ namespace BasicPlusParser
 
             ConsumeToken(typeof(EndToken));
             ConsumeToken(typeof(CaseToken));
+            Regions.Add(new Region(token.LineNo,token.EndCol,_prevToken.EndLineNo,_prevToken.EndCol));
+
             return new CaseStmt
             {
                 Cases = cases
@@ -1006,7 +1008,7 @@ namespace BasicPlusParser
             ConsumeToken(typeof(NewLineToken), optional: true);
             statements = ParseStmts(() => PeekNextToken() is RepeatToken || IsAtEnd(), inLoop: true);
             Token repeatToken = ConsumeToken(typeof(RepeatToken));
-            Regions.Add(new Region(token.LineNo, token.StartCol, repeatToken.LineNo, repeatToken.EndCol));
+            Regions.Add(new Region(token.LineNo, token.EndCol, repeatToken.LineNo, repeatToken.EndCol));
 
             return new LoopRepeatStatement
             {
@@ -1071,7 +1073,7 @@ namespace BasicPlusParser
                 // no significance, so we just eat it.
                 ParseExpr();
             }
-            Regions.Add(new Region(token.LineNo, token.StartCol, _prevToken.LineNo, _prevToken.EndCol));
+            Regions.Add(new Region(token.LineNo, token.EndCol, _prevToken.LineNo, _prevToken.EndCol));
             
             return new ForNextStatement
             {
