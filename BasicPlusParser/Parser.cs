@@ -19,9 +19,9 @@ namespace BasicPlusParser
         HashSet<string> _functions = new();
         HashSet<string> _subroutines = new();
         HashSet<string> _equates = new();
-        // Whenever we jump to a label, store the label so that at the end of parsing, we can check if the jump label 
+        // Whenever we jump to a label, store the label so that at the end of the parsing, we can check if the jump label 
         // has been defined.
-        List<Statement> _jumpStatements = new();
+        List<Token> _jumpLabelTokens = new();
         ParseErrors _parseErrors = new();
         public List<Region> Regions = new();
 
@@ -42,6 +42,7 @@ namespace BasicPlusParser
 
             Procedure procedure = ParseProcedureDeclaration();
             procedure.Statements = ParseStmts(() => IsAtEnd());
+            CheckIfJumpLabelsAreDefined();
             procedure.Labels = _labels;
             procedure.Errors = _parseErrors;
             procedure.Matricies = _matricies;
@@ -798,9 +799,9 @@ namespace BasicPlusParser
             Token label = ConsumeIdToken();
             GoToStatement stmt = new GoToStatement
             {
-                Label = new IdExpression(label.Text, IdentifierType.Label)
+                Label = new IdExpression(label.Text, IdentifierType.Label),
             };
-            _jumpStatements.Add(stmt);
+            _jumpLabelTokens.Add(label);
             return stmt;
         }
 
@@ -870,24 +871,28 @@ namespace BasicPlusParser
             {
                 Token label = ConsumeIdToken();
                 labels.Add(new IdExpression(label.Text, IdentifierType.Label));
-   
+                _jumpLabelTokens.Add(label);
+
             } while (NextTokenIs(typeof(CommaToken)));
 
+
+            Statement stmt;
             if (isGosub)
             {
-                return new OnGosubStatement
+                stmt = new OnGosubStatement
                 {
                     Index = index,
-                    Labels = labels
+                    Labels = labels,
                 };
             } else
             {
-                return new OnGotoStatement
+                stmt = new OnGotoStatement
                 {
                     Index = index,
-                    Labels = labels
+                    Labels = labels,
                 };
             }
+            return stmt;
         }
 
         Statement ParseIfStmt()
@@ -1203,11 +1208,12 @@ namespace BasicPlusParser
         Statement ParseGosubStmt()
         {
             Token label = ConsumeIdToken();
-            //_jumpLabels.Add(label.Text.ToLower());
-            return new GosubStatement
+            GosubStatement gosubStmt = new GosubStatement
             {
-                Label = new IdExpression(label.Text, IdentifierType.Label)
+                Label = new IdExpression(label.Text, IdentifierType.Label),
             };
+            _jumpLabelTokens.Add(label);
+            return gosubStmt;
         }
 
         Statement ParsePlusAssignmentStmt(Token token)
@@ -2276,12 +2282,15 @@ namespace BasicPlusParser
 
         public void CheckIfJumpLabelsAreDefined()
         {
-            /*foreach (string label in _jumpLabels)
+            string errMsg = "The label {0} has not been defined.";
+            foreach(var token in _jumpLabelTokens)
             {
-                if (!_labels.ContainsKey(label)) {
-                    _parseErrors.ReportError("")
+               if (!_labels.ContainsKey(token.Text.ToLower()))
+                {
+                    _parseErrors.ReportError(token, String.Format(errMsg, token.Text));
                 }
-            }*/
+                
+            }
         }
     }
 }
