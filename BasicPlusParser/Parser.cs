@@ -23,6 +23,7 @@ namespace BasicPlusParser
         // has been defined.
         List<Statement> _jumpStatements = new();
         ParseErrors _parseErrors = new();
+        public List<Region> Regions = new();
 
         public Parser(string text)
         {
@@ -222,11 +223,11 @@ namespace BasicPlusParser
                 }
                 else if (token is ForToken)
                 {
-                    return ParseForLoopStmt();
+                    return ParseForLoopStmt(token);
                 }
                 else if (token is LoopToken)
                 {
-                    return ParseLoopRepeatStmt();
+                    return ParseLoopRepeatStmt(token);
                 }
                 else if (token is GosubToken)
                 {
@@ -574,38 +575,41 @@ namespace BasicPlusParser
             bool hasThen = false;
             bool hasElse = false;
 
-            if (NextTokenIs(typeof(ThenToken)))
+            if (NextTokenIs(out Token thenToken, typeof(ThenToken)))
             {
                 hasThen = true;
                 if (NextTokenIs(typeof(NewLineToken)))
                 {
                     thenBlock = ParseStmts(_ =>PeekNextToken() is EndToken);
-                    ConsumeToken(typeof(EndToken));
+                    Token endToken = ConsumeToken(typeof(EndToken));
+
+                    Regions.Add(new Region(thenToken.LineNo,thenToken.StartCol, endToken.LineNo, endToken.EndCol));
                 }
                 else
                 {
                     thenBlock = ParseStmts(_ => PeekNextToken() is ElseToken || PeekNextToken() is NewLineToken || IsAtEnd());
                     if (thenBlock.All(s => s is EmptyStatement) || thenBlock.Count == 0)
                     {
-                        _parseErrors.ReportError(_nextToken, "then block requires at least 1 statement.");
+                        _parseErrors.ReportError(_nextToken, "Then block requires at least 1 statement.");
                     }
                 }
             }
 
-            if (NextTokenIs(typeof(ElseToken)))
+            if (NextTokenIs(out Token elseToken, typeof(ElseToken)))
             {
                 hasElse = true;
                 if (NextTokenIs(typeof(NewLineToken)))
                 {
                     elseBlock = ParseStmts(() => PeekNextToken() is EndToken);
-                    ConsumeToken(typeof(EndToken));
+                    Token endToken = ConsumeToken(typeof(EndToken));
+                    Regions.Add(new Region(elseToken.LineNo, elseToken.StartCol, endToken.LineNo, endToken.EndCol));
                 }
-                else
-                {
+                else 
+                {     
                     elseBlock = ParseStmts(() => PeekNextToken() is NewLineToken || IsAtEnd());
                     if (elseBlock.All(s => s is EmptyStatement) || elseBlock.Count == 0)
                     {
-                        _parseErrors.ReportError(_nextToken, "else block block requires at least 1 statement.");
+                        _parseErrors.ReportError(_nextToken, "Else block block requires at least 1 statement.");
                     }
                 }
             }
@@ -996,12 +1000,14 @@ namespace BasicPlusParser
             };
         }
 
-        Statement ParseLoopRepeatStmt()
+        Statement ParseLoopRepeatStmt(Token token)
         {
             List<Statement> statements = new();
             ConsumeToken(typeof(NewLineToken), optional: true);
             statements = ParseStmts(() => PeekNextToken() is RepeatToken || IsAtEnd(), inLoop: true);
-            ConsumeToken(typeof(RepeatToken));
+            Token repeatToken = ConsumeToken(typeof(RepeatToken));
+            Regions.Add(new Region(token.LineNo, token.StartCol, repeatToken.LineNo, repeatToken.EndCol));
+
             return new LoopRepeatStatement
             {
                 Statements = statements
@@ -1041,7 +1047,7 @@ namespace BasicPlusParser
             };
         }
 
-        public Statement ParseForLoopStmt()
+        public Statement ParseForLoopStmt(Token token)
         {
             List<Statement> statements = new();
             Token startVar = ConsumeIdToken();
@@ -1065,6 +1071,7 @@ namespace BasicPlusParser
                 // no significance, so we just eat it.
                 ParseExpr();
             }
+            Regions.Add(new Region(token.LineNo, token.StartCol, _prevToken.LineNo, _prevToken.EndCol));
             
             return new ForNextStatement
             {

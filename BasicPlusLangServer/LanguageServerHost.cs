@@ -20,6 +20,8 @@ namespace BasicPlusLangServer {
 				.ConfigureLogging(ConfigureLogging)
 				.WithHandler<TextDocumentSyncHandler>()
 				.WithHandler<SemanticTokenHandler>()
+				.WithHandler<FoldingRangeHandler>()
+				//.WithHandler<HoverHandler>()
 				.WithServices(ConfigureServices)
 				.OnInitialize(Initialize);
 		}
