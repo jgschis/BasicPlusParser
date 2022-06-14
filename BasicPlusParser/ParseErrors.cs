@@ -24,8 +24,6 @@ namespace BasicPlusParser
 
         public void ReportError(Token token, string message)
         {
-
-
             int endCol = token.EndCol;
             int endLineNo = token.EndLineNo;
 

@@ -53,7 +53,7 @@ namespace BasicPlusParser.Analyser
                         if (!JumpsTaken.Contains(s))
                         {
                             JumpsTaken.Add(s);
-                            (var gotReturns, var gotoVars) = AnalyseCore(_prog.Labels[s.Label.Name].StatementsFollowingLabel, definiteLocalScope);
+                            (var gotReturns, var gotoVars) = AnalyseCore(_prog.SymbolTable.Labels[s.Label.Name].StatementsFollowingLabel, definiteLocalScope);
                             definiteOuterScope.UnionWith(gotoVars);
                             // Goto always (effectively) returns...
                         }
@@ -97,7 +97,7 @@ namespace BasicPlusParser.Analyser
                         if (!JumpsTaken.Contains(s))
                         {
                             JumpsTaken.Add(s);
-                            var stmtsAfterLabel = _prog.Labels[s.Label.Name].StatementsFollowingLabel;
+                            var stmtsAfterLabel = _prog.SymbolTable.Labels[s.Label.Name].StatementsFollowingLabel;
                             (var gosubReturns, var gosubVars) = AnalyseCore(stmtsAfterLabel, definiteLocalScope);
                             definiteLocalScope.UnionWith(gosubVars);
                             definiteOuterScope.UnionWith(gosubVars);

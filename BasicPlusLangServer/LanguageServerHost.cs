@@ -21,7 +21,7 @@ namespace BasicPlusLangServer {
 				.WithHandler<TextDocumentSyncHandler>()
 				.WithHandler<SemanticTokenHandler>()
 				.WithHandler<FoldingRangeHandler>()
-				//.WithHandler<HoverHandler>()
+				.WithHandler<HoverHandler>()
 				.WithServices(ConfigureServices)
 				.OnInitialize(Initialize);
 		}

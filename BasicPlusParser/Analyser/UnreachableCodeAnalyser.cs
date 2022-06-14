@@ -108,7 +108,7 @@ namespace BasicPlusParser.Analyser
         void AnalyseReachabilityGraph()
         {
             AnalyseReachabilityGraphCore(START);
-            foreach(var label in _prog.Labels)
+            foreach(var label in _prog.SymbolTable.Labels)
             {
                 if (!_reachableLabels.Contains(label.Key))
                 {
@@ -120,7 +120,7 @@ namespace BasicPlusParser.Analyser
         public void Analyse()
         {
             _reachabilityGraph[START] = new();
-            foreach (var lbl in _prog.Labels)
+            foreach (var lbl in _prog.SymbolTable.Labels)
            {
                 _reachabilityGraph[lbl.Key] = new();
            }

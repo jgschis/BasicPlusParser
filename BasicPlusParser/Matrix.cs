@@ -15,7 +15,7 @@ namespace BasicPlusParser
         public Matrix(string name,Expression col, Expression row, IdentifierType identifierType = IdentifierType.Assignment):base(name,identifierType)
         {
             Col = col;
-            Row = row;  
+            Row = row;
         }
     }
 }

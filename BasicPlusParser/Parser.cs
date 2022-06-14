@@ -14,16 +14,10 @@ namespace BasicPlusParser
         public List<Token> _commentTokens;
         Token _nextToken => _nextTokenIndex < _tokens.Count ? _tokens[_nextTokenIndex] : _tokens.Last();
         Token _prevToken => _nextTokenIndex > 0 ? _tokens[_nextTokenIndex - 1] : null;
-        Dictionary<string, Label> _labels = new();
-        Dictionary<string, Matrix> _matricies = new();
-        HashSet<string> _functions = new();
-        HashSet<string> _subroutines = new();
-        HashSet<string> _equates = new();
-        // Whenever we jump to a label, store the label so that at the end of the parsing, we can check if the jump label 
-        // has been defined.
-        List<Token> _jumpLabelTokens = new();
+   
         ParseErrors _parseErrors = new();
         public List<Region> Regions = new();
+        public Symbols SymbolTable = new();
 
         public Parser(string text)
         {
@@ -43,12 +37,8 @@ namespace BasicPlusParser
             Procedure procedure = ParseProcedureDeclaration();
             procedure.Statements = ParseStmts(() => IsAtEnd());
             CheckIfJumpLabelsAreDefined();
-            procedure.Labels = _labels;
             procedure.Errors = _parseErrors;
-            procedure.Matricies = _matricies;
-            procedure.Subroutines = _subroutines;
-            procedure.Equates = _equates;
-            procedure.Functions = _functions;
+            procedure.SymbolTable = SymbolTable;
             return procedure;
         }
 
@@ -103,12 +93,12 @@ namespace BasicPlusParser
                 {
                     do
                     {
-                        // Todo, need to mark a parameter as a matrix.
-                        ConsumeToken(typeof(MatToken), optional: true);
+                        bool isMatrix =  NextTokenIs(typeof(MatToken));
 
                         if (NextTokenIs(out Token argNameToken,typeof(IdentifierToken))) {
                             args.Add(argNameToken.Text);
                             argNameToken.LsClass = "parameter";
+                            SymbolTable.AddParameter(argNameToken, isMatrix);
                         }
                         else
                         {
@@ -210,7 +200,7 @@ namespace BasicPlusParser
                 {
                     return ParseFunctionCallStmt(token);
                 }
-                else if (IsMatrix(token) && NextTokenIs(typeof(LParenToken)))
+                else if (IsMatrix(token))
                 {
                     return ParseMatrixAssignmentStmt(token);
                 }  
@@ -465,7 +455,7 @@ namespace BasicPlusParser
             {
                 case
                     InternalSubStatement s:
-                    _labels.TryAdd(s.Label.Name, new Label(statements.Count, statements));
+                    SymbolTable.Labels.TryAdd(s.Label.Name, new Label(statements.Count, statements));
                     break;
             }
         }
@@ -724,6 +714,7 @@ namespace BasicPlusParser
         AssignmentStatement ParseAssignmentStmt(Token token)
         {
             Expression expr = ParseExpr();
+            SymbolTable.AddVariableReference(token);
             return new AssignmentStatement { Value = expr, Variable = new IdExpression(token.Text,IdentifierType.Assignment) };
         }
 
@@ -743,15 +734,15 @@ namespace BasicPlusParser
 
             do
             {
-                Token func = ConsumeIdToken();
+                Token func = ConsumeIdToken(addIdentifierToSymbolTable: false); ;
                 func.LsClass = "function";
                 functions.Add(new IdExpression(func.Text, IdentifierType.Function));
                 if (pType == ProcedureType.Subroutine)
                 {
-                    _subroutines.Add(func.Text.ToLower());
+                    SymbolTable.AddSubroutineDeclaation(func);
                 } else
                 {
-                    _functions.Add(func.Text.ToLower());
+                    SymbolTable.AddFunctionDeclaration(func);
                 }
             } while (NextTokenIs(typeof(CommaToken)));
 
@@ -761,7 +752,6 @@ namespace BasicPlusParser
                 Functions = functions
             };
         }
-
 
         Statement ParseOpenStmt()
         {
@@ -796,12 +786,12 @@ namespace BasicPlusParser
 
         Statement ParseGoToStmt()
         {
-            Token label = ConsumeIdToken();
+            Token label = ConsumeIdToken(addIdentifierToSymbolTable: false); ;
             GoToStatement stmt = new GoToStatement
             {
                 Label = new IdExpression(label.Text, IdentifierType.Label),
             };
-            _jumpLabelTokens.Add(label);
+            SymbolTable.AddLabelReference(label);
             return stmt;
         }
 
@@ -869,9 +859,9 @@ namespace BasicPlusParser
 
             do
             {
-                Token label = ConsumeIdToken();
+                Token label = ConsumeIdToken(addIdentifierToSymbolTable:false);
                 labels.Add(new IdExpression(label.Text, IdentifierType.Label));
-                _jumpLabelTokens.Add(label);
+                SymbolTable.AddLabelReference(label);
 
             } while (NextTokenIs(typeof(CommaToken)));
 
@@ -946,10 +936,17 @@ namespace BasicPlusParser
             {
                 indexes.Add(ParseExpr(inArray: true));
             }
-            while (indexes.Count < 4 && NextTokenIs(typeof(CommaToken)));
+            while (NextTokenIs(typeof(CommaToken)));
+
+            if (indexes.Count > 3)
+            {
+                _parseErrors.ReportError(token, $"Array {token.Text} has more than 3 indexes.");
+            }
+
             ConsumeToken(typeof(RAngleBracketToken));
             ConsumeToken(typeof(EqualToken));
             Expression expr = ParseExpr();
+            SymbolTable.AddVariableReference(token);
             return new AngleArrayAssignmentStatement
             {
                 Indexes = indexes,
@@ -980,15 +977,15 @@ namespace BasicPlusParser
 
         Statement ParseEquStatement(Token token)
         {
-            Token var = ConsumeIdToken();
+            Token var = ConsumeIdToken(addIdentifierToSymbolTable:false);
             ConsumeToken(typeof(ToToken));
             Expression val = ParseExpr();
-            if (!_equates.Contains(var.Text.ToLower()))
+            if (!SymbolTable.ContainsEquateOrVaraible(var))
             {
-                _equates.Add(var.Text.ToLower());
+                SymbolTable.AddEquateDeclaration(var, val);
             } else
             {
-                _parseErrors.ReportError(GetLineNo(), $"The equate constat {var.Text} has already been defined.", var.StartCol, var.EndCol);
+                _parseErrors.ReportError(var, $"The symol {var.Text} has already been defined.");
             }
             return new EquStatemnet
             {
@@ -1145,10 +1142,17 @@ namespace BasicPlusParser
             {
                 indexes.Add(ParseExpr());
             }
-            while (indexes.Count < 2 && NextTokenIs(typeof(CommaToken)));
+            while (NextTokenIs(typeof(CommaToken)));
+
+            if (indexes.Count > 2)
+            {
+                _parseErrors.ReportError(token, "The square bracket operator ony allows for 2 indexes.");
+            }
+
             ConsumeToken(typeof(RSqrBracketToken));
             ConsumeToken(typeof(EqualToken));
             Expression expr = ParseExpr();
+            SymbolTable.AddVariableReference(token);
             return new SquareBracketArrayAssignmentStatement
             {
                 Indexes = indexes,
@@ -1199,11 +1203,12 @@ namespace BasicPlusParser
             //     || PeekNextToken() is EofToken);   
 
 
-            if (_labels.ContainsKey(token.Text.ToLower())){
+            if (SymbolTable.IsLabelDeclared(token)){
                 _parseErrors.ReportError(token, $"The label {token.Text} has already been defined.");
             }
 
             token.LsClass = "label";
+            SymbolTable.AddLabelDeclaration(token);
             return new InternalSubStatement
             {
                 Label = new IdExpression(token.Text,IdentifierType.Label),
@@ -1213,18 +1218,20 @@ namespace BasicPlusParser
 
         Statement ParseGosubStmt()
         {
-            Token label = ConsumeIdToken();
+            Token label = ConsumeIdToken(addIdentifierToSymbolTable:false);
+            label.LsClass = "label";
             GosubStatement gosubStmt = new GosubStatement
             {
                 Label = new IdExpression(label.Text, IdentifierType.Label),
             };
-            _jumpLabelTokens.Add(label);
+            SymbolTable.AddLabelReference(label);
             return gosubStmt;
         }
 
         Statement ParsePlusAssignmentStmt(Token token)
         {
             Expression expr = ParseExpr();
+            SymbolTable.AddVariableReference(token);
             return new PlusAssignmentStatement
             {
                 Value = expr,
@@ -1234,7 +1241,8 @@ namespace BasicPlusParser
 
         Statement ParseInsertStmt()
         {
-            Token insert = ConsumeIdToken();
+            Token insert = ConsumeIdToken(addIdentifierToSymbolTable: false);
+            SymbolTable.AddInsert(insert);
             return new InsertStatement
             {
                 Name = new IdExpression(insert.Text, IdentifierType.Insert)
@@ -1244,6 +1252,7 @@ namespace BasicPlusParser
         Statement ParseMinusAssignmentStmt(Token token)
         {
             Expression expr = ParseExpr();
+            SymbolTable.AddVariableReference(token);
             return new MinusAssignmentStatement
             {
                 Value = expr,
@@ -1254,6 +1263,7 @@ namespace BasicPlusParser
         Statement ParseDivideAssignmentStmt(Token token)
         {
             Expression expr = ParseExpr();
+            SymbolTable.AddVariableReference(token);
             return new DivideAssignmentStatement
             {
                 Value = expr,
@@ -1263,6 +1273,7 @@ namespace BasicPlusParser
         Statement ParseMulAssignmentStmt(Token token)
         {
             Expression expr = ParseExpr();
+            SymbolTable.AddVariableReference(token);
             return new MulAssignmentStatement
             {
                 Value = expr,
@@ -1289,6 +1300,7 @@ namespace BasicPlusParser
         Statement ParseConcatAssignmentStmt(Token token)
         {
             Expression expr = ParseExpr();
+            SymbolTable.AddVariableReference(token);
             return new ConcatAssignmentStatement
             {
                 Value = expr,
@@ -1315,7 +1327,7 @@ namespace BasicPlusParser
                 funcExpr = (FuncExpression)ParseFunc(funcName, mustReturnValue: false, declarationRequired: declarationRequired);
             } else
             {
-                if (declarationRequired && !_subroutines.Contains(funcName.Text.ToLower()))
+                if (declarationRequired && !SymbolTable.IsSubroutineDeclared(funcName))
                 {
                     _parseErrors.ReportError(funcName, $"{funcName.Text} must be declared as a subroutine.");
                 }
@@ -1360,7 +1372,7 @@ namespace BasicPlusParser
             List<Matrix> matricies = new();
             do
             {
-                Token matVar = ConsumeIdToken();
+                Token matVar = ConsumeIdToken(addIdentifierToSymbolTable:false);
                 ConsumeToken(typeof(LParenToken));
                 Expression row = ParseExpr();
                 Expression col = null;
@@ -1368,14 +1380,16 @@ namespace BasicPlusParser
                 {
                     col = ParseExpr();
                 }
+                
                 ConsumeToken(typeof(RParenToken));
                 Matrix matrix = new Matrix(matVar.Text, col, row);
                 matricies.Add(matrix);
-                if (!_matricies.ContainsKey(matVar.Text.ToLower())) {
-                    _matricies.Add(matVar.Text.ToLower(), matrix);
+
+                if (!SymbolTable.ContainsEquateOrVaraible(matVar)) {
+                    SymbolTable.AddMatrixDeclaration(matVar, col, row);
                 } else
                 {
-                    _parseErrors.ReportError(matVar, $"The matrix {matVar.Text} has already been defined.");
+                    _parseErrors.ReportError(matVar, $"The symbol {matVar.Text} has already been defined.");
                 }
 
             } while (NextTokenIs(typeof(CommaToken)));
@@ -1664,16 +1678,25 @@ namespace BasicPlusParser
 
         Statement ParseMatrixAssignmentStmt (Token token)
         {
+
+            if (!NextTokenIs(typeof(LParenToken))){
+                throw Error(token, $"{token.Text} is a matrix and therefore requires a subscript.");
+            }
+
+
             Expression row = ParseExpr();
             Expression col = null;
             if (NextTokenIs(typeof(CommaToken)))
             {
                 col = ParseExpr();
             }
+
+
             ConsumeToken(typeof(RParenToken));
             ConsumeToken(typeof(EqualToken));
             Expression value = ParseExpr();
 
+            SymbolTable.AddVariableReference(token);
             return new MatAssignmentStatement
             {
                 Value = value,
@@ -1905,12 +1928,12 @@ namespace BasicPlusParser
 
             if (token is IdentifierToken )
             {
-                if (NextTokenIs(typeof(LParenToken)))
+                if (IsMatrix(token)){
+                    expr = ParseMatrixIndexExpression(token);
+                }
+                else if (NextTokenIs(typeof(LParenToken)))
                 {
-                    if (IsMatrix(token)){
-                        expr = ParseMatrixIndexExpression(token);
-                    }
-                    else if (token.DisallowFunction == false)
+                    if (token.DisallowFunction == false)
                     {
                         expr = ParseFunc(token);
                     }
@@ -1922,6 +1945,9 @@ namespace BasicPlusParser
                 else
                 {
                     expr = new IdExpression(token.Text, IdentifierType.Reference);
+
+                    SymbolTable.AddVariableReference(token);
+                    
                 }
             }
             else if (token is NumberToken)
@@ -2046,9 +2072,9 @@ namespace BasicPlusParser
 
             if (PeekNextToken() is RAngleBracketToken)
             {
-                if (indexes.Count > 4)
+                if (indexes.Count >3)
                 {
-                    _parseErrors.ReportError(token, $"Array {token.Text} has more than 4 indexes.");
+                    _parseErrors.ReportError(token, $"Array {token.Text} has more than 3 indexes.");
                 }
                 _nextTokenIndex += 1;
                 return new AngleArrExpression { Indexes = indexes, Source = baseExpr };
@@ -2082,22 +2108,27 @@ namespace BasicPlusParser
 
         Expression ParseFunc(Token token, bool mustReturnValue = true, bool declarationRequired = true)
         {
-
             token.LsClass = "function";
             if (declarationRequired)
             {
                 if (mustReturnValue)
                 {
-                    if (!_functions.Contains(token.Text.ToLower()))
+                    if (!SymbolTable.IsFunctionDeclared(token))
                     {
                         _parseErrors.ReportError(token, $"{token.Text} must be declared as a function");
+                    } else
+                    {
+                        SymbolTable.AddFunctionReference(token);
                     }
                 }
                 else
                 {
-                    if (!_subroutines.Contains(token.Text.ToLower()))
+                    if (!SymbolTable.IsSubroutineDeclared(token))
                     {
                         _parseErrors.ReportError(token, $"{token.Text} must be declared as a subroutine.");
+                    } else
+                    {
+                        SymbolTable.AddSubroutineReference(token);
                     }
                 }
             }
@@ -2135,12 +2166,19 @@ namespace BasicPlusParser
 
         Expression ParseMatrixIndexExpression(Token token)
         {
-            Expression row = ParseExpr();
-            Expression col = null;
+            if (!NextTokenIs(typeof(LParenToken)))
+            {
+                throw Error(token, $"{token.Text} is a matrix and therefore requires subscript/s");
+            }
+
+            Expression col = ParseExpr();
+            Expression row = null;
             if (NextTokenIs(typeof(CommaToken))){
-                col = ParseExpr();
+                row = ParseExpr();
             }
             ConsumeToken(typeof(RParenToken));
+
+            SymbolTable.AddVariableReference(token);
 
             return new MatrixIndexExpression { Col = col, Row = row, 
                 Name = new IdExpression(token.Text, IdentifierType.Reference) };
@@ -2218,7 +2256,7 @@ namespace BasicPlusParser
             return _tokens[_nextTokenIndex++];
         }
 
-        Token ConsumeIdToken(string message = "Identifier expected.")
+        Token ConsumeIdToken(string message = "Identifier expected.", bool addIdentifierToSymbolTable = true)
         {
             Token token = PeekNextToken();
             if (token.GetType() != typeof(IdentifierToken))
@@ -2226,6 +2264,7 @@ namespace BasicPlusParser
                 //_parseErrors.ReportError(token, message);
                 throw Error(token, message);
             }
+            if (addIdentifierToSymbolTable) SymbolTable.AddVariableReference(token);
             return _tokens[_nextTokenIndex++];
         }
 
@@ -2263,7 +2302,7 @@ namespace BasicPlusParser
 
         bool IsMatrix(Token token)
         {
-            return _matricies.ContainsKey(token.Text.ToLower());
+            return SymbolTable.IsMatrix(token);
         }
 
         void ConsumeSemiColonsUntilEndOfLine()
@@ -2289,9 +2328,9 @@ namespace BasicPlusParser
         public void CheckIfJumpLabelsAreDefined()
         {
             string errMsg = "The label {0} has not been defined.";
-            foreach(var token in _jumpLabelTokens)
+            foreach(var token in SymbolTable.LabelReferences)
             {
-               if (!_labels.ContainsKey(token.Text.ToLower()))
+               if (!SymbolTable.IsLabelDeclared(token))
                 {
                     _parseErrors.ReportError(token, String.Format(errMsg, token.Text));
                 }

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace BasicPlusParser.Statements.Expressions
 {
-    class NumExpression : Expression
+    public class NumExpression : Expression
     {
         public string Value;
     }
