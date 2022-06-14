@@ -165,6 +165,11 @@ namespace BasicPlusParser
             }
         }
 
+        public bool IsCommonBlockNameDefined(Token token)
+        {
+            return _symbols.ContainsKey(GetSymbolKey(SymbolKind.CommonLabel, token));
+        }
+
         public  void AddParameter(Token token, bool isMatrix = false)
         {
             Symbol symbol;

@@ -1440,7 +1440,10 @@ namespace BasicPlusParser
                 nSlashes += 1;
             }
 
-            Token commonBlockId = ConsumeIdToken();
+            Token commonBlockId = ConsumeIdToken(addIdentifierToSymbolTable:false);
+            if (SymbolTable.IsCommonBlockNameDefined(commonBlockId)){
+                _parseErrors.ReportError(commonBlockId, $"The symbol {commonBlockId.Text} has already been defined.");
+            }
 
             for(int i = 1; i <= nSlashes;i++)
             {
@@ -1450,11 +1453,21 @@ namespace BasicPlusParser
             List<IdExpression> globalVars = new();
             do
             {
-                Token name = ConsumeIdToken();
+                Token name = ConsumeIdToken(addIdentifierToSymbolTable: false);
+                if (SymbolTable.ContainsEquateOrVaraible(name)){
+                    _parseErrors.ReportError(name,$"The symbol {name.Text} has already been defined.");
+
+                } else
+                {
+                    SymbolTable.AddCommonDeclaration(name);
+                }
+
                 globalVars.Add(new IdExpression(name.Text));
 
             } while (NextTokenIs(typeof(CommaToken)));
 
+
+            SymbolTable.AddCommonLabel(commonBlockId);
             return new CommonStatement
             {
                 CommonName = new IdExpression(commonBlockId.Text),
