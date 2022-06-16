@@ -87,6 +87,11 @@ namespace BasicPlusParser
             AddSymbol(new(token, SymbolKind.Variable, scope: VariableScope.Common));
         }
 
+        public void AddCommonDeclaration(Token token, Expression col, Expression row)
+        {
+            AddSymbol(new(token, SymbolKind.Variable,col,row, VariableScope.Common));
+        }
+
 
         public void AddSubroutineReference(Token token)
         {

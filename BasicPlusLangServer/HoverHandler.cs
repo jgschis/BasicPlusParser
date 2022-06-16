@@ -106,6 +106,7 @@ namespace BasicPlusLangServer
                 Token token = tokens[index];
                 if (token.LineNo == lineNo && token.StartCol <= lineCol && token.EndCol >= lineCol)
                 {
+                    // Return exact match
                     return token;
                 }
                 else if (token.LineNo < lineNo || (token.LineNo == lineNo && token.StartCol < lineCol))

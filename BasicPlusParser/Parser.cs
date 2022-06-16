@@ -421,7 +421,7 @@ namespace BasicPlusParser
             {
                 return ParseUntilStmt();
             }
-            throw Error(token, $"{token.Text} is not a the start of a valid statement.");
+            throw Error(token, $"{token.Text} is not a valid statement.");
         }
 
         void ConsumeStatementSeparator()
@@ -1454,13 +1454,40 @@ namespace BasicPlusParser
             do
             {
                 Token name = ConsumeIdToken(addIdentifierToSymbolTable: false);
+
+                bool isMatrix = false;
+                Expression matCols = null;
+                Expression matRows = null;
+                if (NextTokenIs(typeof(LParenToken)))
+                {
+                    isMatrix = true;
+                    matCols = ParseExpr();
+                    matRows = null;
+
+                    if (NextTokenIs(typeof(CommaToken)))
+                    {
+                        matRows = ParseExpr();
+                    }
+                    ConsumeToken(typeof(RParenToken));
+                }
+
+
                 if (SymbolTable.ContainsEquateOrVaraible(name)){
                     _parseErrors.ReportError(name,$"The symbol {name.Text} has already been defined.");
 
                 } else
                 {
-                    SymbolTable.AddCommonDeclaration(name);
+                    if (isMatrix)
+                    {
+                        SymbolTable.AddCommonDeclaration(name,matCols,matRows);
+                    }
+                    else
+                    {
+                        SymbolTable.AddCommonDeclaration(name);
+
+                    }
                 }
+
 
                 globalVars.Add(new IdExpression(name.Text));
 
