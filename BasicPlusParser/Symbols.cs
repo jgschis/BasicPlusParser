@@ -68,9 +68,14 @@ namespace BasicPlusParser
             if (!_symbols.TryGetValue(GetSymbolKey(SymbolKind.Label, token), out Symbol symbol))
             {
                 symbol = new Symbol(token, SymbolKind.Label);
+                symbol.LabelDeclared = true;
+                AddSymbol(symbol);
             }
-            symbol.LabelDeclared = true;
-            AddSymbol(symbol);
+            else
+            {
+                symbol.LabelDeclared = true;
+                UpdateIndex(token.LineNo, token.StartCol, symbol);
+            }
         }
 
         public void AddCommonLabel(Token token)
@@ -111,11 +116,16 @@ namespace BasicPlusParser
 
         public void AddLabelReference(Token token)
         {
-            if (!_symbols.TryGetValue(GetSymbolKey(SymbolKind.Label,token), out Symbol symbol)){
+            if (!_symbols.TryGetValue(GetSymbolKey(SymbolKind.Label, token), out Symbol symbol))
+            {
                 symbol = new Symbol(token, SymbolKind.Label);
+                AddSymbol(symbol);
             }
+            else { 
+                UpdateIndex(token.LineNo, token.StartCol, symbol);
+            }
+
             LabelReferences.Add(token);
-            AddSymbol(symbol);
         }
 
         public bool IsMatrix(Token token)

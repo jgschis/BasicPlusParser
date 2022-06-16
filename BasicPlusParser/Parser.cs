@@ -786,7 +786,8 @@ namespace BasicPlusParser
 
         Statement ParseGoToStmt()
         {
-            Token label = ConsumeIdToken(addIdentifierToSymbolTable: false); ;
+            Token label = ConsumeIdToken(addIdentifierToSymbolTable: false);
+            label.LsClass = "label";
             GoToStatement stmt = new GoToStatement
             {
                 Label = new IdExpression(label.Text, IdentifierType.Label),
@@ -860,6 +861,7 @@ namespace BasicPlusParser
             do
             {
                 Token label = ConsumeIdToken(addIdentifierToSymbolTable:false);
+                label.LsClass = "label";
                 labels.Add(new IdExpression(label.Text, IdentifierType.Label));
                 SymbolTable.AddLabelReference(label);
 
