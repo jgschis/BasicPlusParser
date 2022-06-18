@@ -12,7 +12,8 @@ UnreachableCodeAnalyser analyser = new UnreachableCodeAnalyser(program);
 analyser.Analyse();
 ```
 The parser also contains an implementation of the language server protocol, which means you can use the parser in any IDE that implements the language server protocol, for example Visual Studio Code:
-![image](https://user-images.githubusercontent.com/87922814/170830212-fc152117-a2ac-44e5-b1ec-db8c385c0346.png)
+![image](https://user-images.githubusercontent.com/87922814/174413924-5ae55d50-889d-4a5a-a9c1-e763c4c46e46.png)
+
 
 
 TODO
