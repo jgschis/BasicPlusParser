@@ -1954,7 +1954,7 @@ namespace BasicPlusParser
 
         Expression ParsePowerExpr()
         {
-            Expression expr = ParseAtom();
+            Expression expr = ParseArrayExpr();
             while (NextTokenIs(out Token optoken, typeof(PowerToken)))
             {
                 Expression right = ParseAtom();
@@ -1963,14 +1963,44 @@ namespace BasicPlusParser
             return expr;
         }
 
+        Expression ParseArrayExpr()
+        {
+            Expression expr = ParseAtom();
+
+            while (NextTokenIs(out Token optoken, typeof(LAngleBracketToken), typeof(LSqrBracketToken)))
+            {
+                if (optoken is LAngleBracketToken)
+                {
+                    Expression arrayExpr = ParseAngleArray(optoken, expr);
+                    if (arrayExpr == null)
+                    {
+                        // Not an array so break out.
+                        break;
+                    }
+                    else
+                    {
+                        expr = arrayExpr;
+                    }
+                }
+                else
+                {
+                    expr = ParseSqrBracketArray(optoken, expr);
+                }
+            }
+
+            return expr;
+        }
+
+
         Expression ParseAtom()
         {
             Expression expr;
             Token token = GetNextToken();
 
-            if (token is IdentifierToken )
+            if (token is IdentifierToken)
             {
-                if (IsMatrix(token)){
+                if (IsMatrix(token))
+                {
                     expr = ParseMatrixIndexExpression(token);
                 }
                 else if (NextTokenIs(typeof(LParenToken)))
@@ -1984,12 +2014,14 @@ namespace BasicPlusParser
                         throw Error(token, "Expression expected.");
                     }
                 }
+                else if (PeekNextToken() is MinusToken && PeekNextToken(1) is RAngleBracketToken)
+                {
+                    expr = ParseOleExpr(token);
+                }
                 else
                 {
                     expr = new IdExpression(token.Text, IdentifierType.Reference);
-
                     SymbolTable.AddVariableReference(token);
-                    
                 }
             }
             else if (token is NumberToken)
@@ -2011,8 +2043,9 @@ namespace BasicPlusParser
                 ConsumeToken(typeof(RCurlyToken));
                 expr = new CurlyExpression { Value = expr };
             }
-            else if (token is MinusToken) {
-                expr = new NegateExpression { Operator = token.Text, Argument = ParseAtom() };
+            else if (token is MinusToken)
+            {
+                 expr = new NegateExpression { Operator = token.Text, Argument = ParseAtom() };  
             }
             else if (token is PlusToken)
             {
@@ -2033,29 +2066,33 @@ namespace BasicPlusParser
             }
             else
             {
-                throw Error(token,"Expression expected.");
+                throw Error(token, "Expression expected.");
             }
 
-            while (NextTokenIs(out Token optoken, typeof(LAngleBracketToken), typeof(LSqrBracketToken)))
-            {
-                if (optoken is LAngleBracketToken)
-                {
-                    Expression arrayExpr = ParseAngleArray(token, expr);
-                    if (arrayExpr == null)
-                    {
-                        // Not an array so break out.
-                        break;
-                    } else
-                    {
-                        expr = arrayExpr;
-                    }
-                }
-                else
-                {
-                    expr = ParseSqrBracketArray(token, expr);
-                }
-            }
             return expr;
+        }
+
+        Expression ParseOleExpr(Token token)
+        {
+            ConsumeToken(typeof(MinusToken));
+            ConsumeToken(typeof(RAngleBracketToken));
+
+            Token memberToken = ConsumeIdToken();
+            Expression memberExpr;
+
+            if (NextTokenIs(typeof(LParenToken))){
+                memberExpr = ParseFunc(memberToken, declarationRequired:false);
+                memberToken.LsClass = "variable";
+            }
+            else
+            {
+                // TODO make new reference type.
+                memberExpr = new IdExpression(memberToken.Text, IdentifierType.Assignment);
+            }
+
+            SymbolTable.AddVariableReference(token);
+            return new OleExpression { Object = new IdExpression(token.Text, IdentifierType.Reference), Member = memberExpr };
+
         }
 
         Expression ParseArrayInitExpression(Token token)
