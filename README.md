@@ -15,12 +15,4 @@ The parser also contains an implementation of the language server protocol, whic
 ![image](https://user-images.githubusercontent.com/87922814/174413924-5ae55d50-889d-4a5a-a9c1-e763c4c46e46.png)
 
 
-
-TODO
-------
-* Add support for -> operator
-* Add support for {X} operator
-
-
-
 +There are actaully 2 issues with the unassigned variable analyser. The first is that if will loop infinitely if you have recursive gosubs. The second is that that analyser can't handle a label that spans 2 or more blocks (i.e., a label that is in two loop-repeat statements. There is a way to fix both problems.
