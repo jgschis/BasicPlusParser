@@ -2,6 +2,7 @@
 using System.Reflection;
 using System;
 using BasicPlusParser.Statements.Expressions;
+using BasicPlusParser.Tokens;
 
 namespace BasicPlusParser
 {
@@ -11,9 +12,9 @@ namespace BasicPlusParser
         public int LineCol;
         public int EndCol;
       
-        public virtual HashSet<string> GetAssignedVars()
+        public virtual HashSet<Token> GetAssignedVars()
         {
-            HashSet<string> assignedVars = new();
+            HashSet<Token> assignedVars = new(new TokenEqualityComparer());
             FieldInfo[] fields = this.GetType().GetFields();
             foreach (var field in fields)
             {
@@ -22,7 +23,7 @@ namespace BasicPlusParser
                 {
 
                     case IdExpression es when es.IdentifierType == IdentifierType.Assignment:
-                        assignedVars.Add(es.Name);
+                        assignedVars.Add(es.Token);
                         break;
 
                     case Statement s:
@@ -33,7 +34,7 @@ namespace BasicPlusParser
                         {
                             if (v is IdExpression es && es.IdentifierType == IdentifierType.Assignment)
                             {
-                                assignedVars.Add(es.Name);
+                                assignedVars.Add(es.Token);
                             } else
                             {
                                 assignedVars.UnionWith(v.GetAssignedVars());
@@ -46,9 +47,11 @@ namespace BasicPlusParser
         }
     
 
-        public virtual HashSet<string> GetReferencedVars()
+        public virtual HashSet<Token> GetReferencedVars()
         {
-            HashSet<string> referencedVars = new();
+            
+
+            HashSet<Token> referencedVars = new(new TokenEqualityComparer());
             FieldInfo[] fields = this.GetType().GetFields();
             foreach (var field in fields)
             {
@@ -57,7 +60,7 @@ namespace BasicPlusParser
                 {
 
                     case IdExpression es when es.IdentifierType == IdentifierType.Reference:
-                        referencedVars.Add(es.Name);
+                        referencedVars.Add(es.Token);
                         break;
     
                     case Statement e:

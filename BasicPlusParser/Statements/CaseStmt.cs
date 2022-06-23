@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using BasicPlusParser.Tokens;
+using System.Collections.Generic;
 
 namespace BasicPlusParser.Statements
 {
@@ -6,9 +7,9 @@ namespace BasicPlusParser.Statements
     {
         public List<Case> Cases;
 
-        public override HashSet<string> GetReferencedVars()
+        public override HashSet<Token> GetReferencedVars()
         {
-            HashSet<string> referencedVars = new();
+            HashSet<Token> referencedVars = new(new TokenEqualityComparer());
             foreach (var @case in Cases)
             {
                 referencedVars.UnionWith(@case.Condition.GetReferencedVars());

@@ -1,4 +1,5 @@
 ﻿using BasicPlusParser.Statements.Expressions;
+using BasicPlusParser.Tokens;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,7 +13,7 @@ namespace BasicPlusParser
         public Expression Col;
         public Expression Row;
 
-        public Matrix(string name,Expression col, Expression row, IdentifierType identifierType = IdentifierType.Assignment):base(name,identifierType)
+        public Matrix(Token token,Expression col, Expression row, IdentifierType identifierType = IdentifierType.Assignment):base(token,identifierType)
         {
             Col = col;
             Row = row;

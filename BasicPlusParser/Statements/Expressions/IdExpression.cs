@@ -1,20 +1,17 @@
 ﻿using BasicPlusParser.Tokens;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+
 
 namespace BasicPlusParser.Statements.Expressions
 {
     public class IdExpression : Expression
     {
+        public Token Token;
         public string Name
         {
             set { NameRaw = value; }
             get
             {
-                return NameRaw?.ToLower();
+                return Token.Text.ToLower();
             }
         }
         public string NameRaw;
@@ -22,10 +19,11 @@ namespace BasicPlusParser.Statements.Expressions
 
         public IdentifierType IdentifierType;
 
-        public IdExpression(string name, IdentifierType identifierType = IdentifierType.Assignment)
+        public IdExpression(Token token, IdentifierType identifierType = IdentifierType.Assignment)
         {
-            Name = name;
+            Token = token;
             IdentifierType = identifierType;
+            Name = token.Text;
         }
 
     }

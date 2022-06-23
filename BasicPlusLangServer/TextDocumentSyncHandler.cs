@@ -78,6 +78,8 @@ namespace BasicPlusLangServer
             Procedure program = parser.Parse();
             UnreachableCodeAnalyser uca = new(program);
             uca.Analyse();
+            UnassignedVariableAnalyser uva = new(program);
+            uva.Analyse();
 
             List<Diagnostic> diagnoistics = new();
             foreach (var error in program.Errors.Errors)
@@ -105,6 +107,23 @@ namespace BasicPlusLangServer
                 };
                 diagnoistics.Add(diagnostic);
             }
+
+            foreach (var result in uva.UnassignedVars)
+            {
+                var token = result.Item1;
+                var stmt = result.Item2;
+
+                Diagnostic diagnostic = new()
+                {
+                    Severity = DiagnosticSeverity.Warning,
+                    Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(token.LineNo - 1, token.StartCol, token.LineNo - 1, token.EndCol),
+                    Message = $"The variable {token.Text} is not definitively assigned.",
+                    Source = "ex",
+                    Code = "a"
+                };
+                diagnoistics.Add(diagnostic);
+            }
+
 
             foreach (var label in uca.UnreachableLabels)
             {

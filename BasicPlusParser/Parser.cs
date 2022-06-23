@@ -678,7 +678,7 @@ namespace BasicPlusParser
                 Handle = handle,
                 Key = key,
                 Then = thenBlock,
-                Var = new IdExpression(var.Text)
+                Var = new IdExpression(var)
             };
         }
 
@@ -707,7 +707,7 @@ namespace BasicPlusParser
                 Handle = handle,
                 Key = key,
                 Then = thenBlock,
-                Variable = new IdExpression(var.Text,IdentifierType.Assignment)
+                Variable = new IdExpression(var,IdentifierType.Assignment)
             };
         }
 
@@ -715,7 +715,7 @@ namespace BasicPlusParser
         {
             Expression expr = ParseExpr();
             SymbolTable.AddVariableReference(token);
-            return new AssignmentStatement { Value = expr, Variable = new IdExpression(token.Text,IdentifierType.Assignment) };
+            return new AssignmentStatement { Value = expr, Variable = new IdExpression(token,IdentifierType.Assignment) };
         }
 
         Statement ParseDeclareStmt()
@@ -736,7 +736,7 @@ namespace BasicPlusParser
             {
                 Token func = ConsumeIdToken(addIdentifierToSymbolTable: false); ;
                 func.LsClass = "function";
-                functions.Add(new IdExpression(func.Text, IdentifierType.Function));
+                functions.Add(new IdExpression(func, IdentifierType.Function));
                 if (pType == ProcedureType.Subroutine)
                 {
                     SymbolTable.AddSubroutineDeclaation(func);
@@ -767,7 +767,7 @@ namespace BasicPlusParser
             return new OpenStatement
             {
                 Else = elseBlock,
-                Handle = new IdExpression(handle.Text),
+                Handle = new IdExpression(handle),
                 Table = table,
                 Then = thenBlock
             };
@@ -790,7 +790,7 @@ namespace BasicPlusParser
             label.LsClass = "label";
             GoToStatement stmt = new GoToStatement
             {
-                Label = new IdExpression(label.Text, IdentifierType.Label),
+                Label = new IdExpression(label, IdentifierType.Label),
             };
             SymbolTable.AddLabelReference(label);
             return stmt;
@@ -826,7 +826,7 @@ namespace BasicPlusParser
                     Haystack = haystack,
                     Delim = delim,
                     Else = elseBlock,
-                    Pos = new IdExpression(pos.Text),
+                    Pos = new IdExpression(pos),
                     Seq = seq,
                     Then = thenBlock
                 };
@@ -838,7 +838,7 @@ namespace BasicPlusParser
                     Else = elseBlock,
                     Haystack = haystack,
                     Needle = needle,
-                    Start = new IdExpression(pos.Text),
+                    Start = new IdExpression(pos),
                     Then = thenBlock
                 };
             } 
@@ -862,7 +862,7 @@ namespace BasicPlusParser
             {
                 Token label = ConsumeIdToken(addIdentifierToSymbolTable:false);
                 label.LsClass = "label";
-                labels.Add(new IdExpression(label.Text, IdentifierType.Label));
+                labels.Add(new IdExpression(label, IdentifierType.Label));
                 SymbolTable.AddLabelReference(label);
 
             } while (NextTokenIs(typeof(CommaToken)));
@@ -952,7 +952,7 @@ namespace BasicPlusParser
             return new AngleArrayAssignmentStatement
             {
                 Indexes = indexes,
-                Variable = new IdExpression(token.Text, IdentifierType.Reference),
+                Variable = new IdExpression(token, IdentifierType.Reference),
                 Value = expr
             };
         }
@@ -991,7 +991,7 @@ namespace BasicPlusParser
             }
             return new EquStatemnet
             {
-                Variable = new IdExpression(var.Text),
+                Variable = new IdExpression(var),
                 Value = val
             };
         }
@@ -1038,7 +1038,7 @@ namespace BasicPlusParser
                 {
                     _parseErrors.ReportError(otherMatrixToken, $"The identifier {otherMatrixToken.Text} must be dimensioned.");
                 }
-                otherMatrix = new IdExpression(otherMatrixToken.Text, IdentifierType.Reference);
+                otherMatrix = new IdExpression(otherMatrixToken, IdentifierType.Reference);
             }
             else
             {
@@ -1047,7 +1047,7 @@ namespace BasicPlusParser
            
             return new MatStatement
             {
-                Variable = new IdExpression(matrix.Text),
+                Variable = new IdExpression(matrix),
                 Value = value,
                 OtherMatrix = otherMatrix
             };
@@ -1110,8 +1110,8 @@ namespace BasicPlusParser
             return new ReadNextStatement
             {
                 Cursor = cursor,
-                Value = new IdExpression(value?.Text),
-                Variable = new IdExpression( variable.Text),
+                Value = new IdExpression(value),
+                Variable = new IdExpression(variable),
                 Else = elseBlock,
                 Then = thenBlock
             };
@@ -1129,10 +1129,10 @@ namespace BasicPlusParser
             Token flag = ConsumeIdToken();
             return new RemoveStatement
             {
-                Variable = new IdExpression(var.Text),
+                Variable = new IdExpression(var),
                 From = from,
-                Pos = new IdExpression(pos.Text),
-                Flag = new IdExpression(flag.Text)
+                Pos = new IdExpression(pos),
+                Flag = new IdExpression(flag)
             };
 
         }
@@ -1158,7 +1158,7 @@ namespace BasicPlusParser
             return new SquareBracketArrayAssignmentStatement
             {
                 Indexes = indexes,
-                Variable = new IdExpression(token.Text, IdentifierType.Reference),
+                Variable = new IdExpression(token, IdentifierType.Reference),
                 Value = expr
             };
         }
@@ -1181,7 +1181,7 @@ namespace BasicPlusParser
             Token variable = ConsumeIdToken();
             return new SwapStatement
             {
-                Variable = new IdExpression(variable.Text),
+                Variable = new IdExpression(variable),
                 New = newVal,
                 Old = oldVal
             };
@@ -1213,7 +1213,7 @@ namespace BasicPlusParser
             SymbolTable.AddLabelDeclaration(token);
             return new InternalSubStatement
             {
-                Label = new IdExpression(token.Text,IdentifierType.Label),
+                Label = new IdExpression(token,IdentifierType.Label),
                // Statements = statements
             };
         }
@@ -1224,7 +1224,7 @@ namespace BasicPlusParser
             label.LsClass = "label";
             GosubStatement gosubStmt = new GosubStatement
             {
-                Label = new IdExpression(label.Text, IdentifierType.Label),
+                Label = new IdExpression(label, IdentifierType.Label),
             };
             SymbolTable.AddLabelReference(label);
             return gosubStmt;
@@ -1237,7 +1237,7 @@ namespace BasicPlusParser
             return new PlusAssignmentStatement
             {
                 Value = expr,
-                Variable = new IdExpression(token.Text, IdentifierType.Reference)
+                Variable = new IdExpression(token, IdentifierType.Reference)
             };
         }
 
@@ -1247,7 +1247,7 @@ namespace BasicPlusParser
             SymbolTable.AddInsert(insert);
             return new InsertStatement
             {
-                Name = new IdExpression(insert.Text, IdentifierType.Insert)
+                Name = new IdExpression(insert, IdentifierType.Insert)
             };
         }
 
@@ -1258,7 +1258,7 @@ namespace BasicPlusParser
             return new MinusAssignmentStatement
             {
                 Value = expr,
-                Variable = new IdExpression(token.Text,IdentifierType.Reference)
+                Variable = new IdExpression(token,IdentifierType.Reference)
             };
         }
 
@@ -1269,7 +1269,7 @@ namespace BasicPlusParser
             return new DivideAssignmentStatement
             {
                 Value = expr,
-                Variable = new IdExpression(token.Text, IdentifierType.Reference)
+                Variable = new IdExpression(token, IdentifierType.Reference)
             };
         }
         Statement ParseMulAssignmentStmt(Token token)
@@ -1279,7 +1279,7 @@ namespace BasicPlusParser
             return new MulAssignmentStatement
             {
                 Value = expr,
-                Name = new IdExpression(token.Text,IdentifierType.Reference)
+                Name = new IdExpression(token,IdentifierType.Reference)
             };
         }
 
@@ -1306,7 +1306,7 @@ namespace BasicPlusParser
             return new ConcatAssignmentStatement
             {
                 Value = expr,
-                Variable = new IdExpression(token.Text, IdentifierType.Reference)
+                Variable = new IdExpression(token, IdentifierType.Reference)
             };
         }
 
@@ -1333,7 +1333,7 @@ namespace BasicPlusParser
                 {
                     _parseErrors.ReportError(funcName, $"{funcName.Text} must be declared as a subroutine.");
                 }
-                funcExpr = new FuncExpression { Function = new IdExpression(funcName.Text, IdentifierType.Function), Args = new() };
+                funcExpr = new FuncExpression { Function = new IdExpression(funcName, IdentifierType.Function), Args = new() };
             }
                 return new CallStatement
             {
@@ -1348,8 +1348,8 @@ namespace BasicPlusParser
             Token to = ConsumeIdToken();
             return new TransferStatement
             {
-                From = new IdExpression(from.Text, IdentifierType.Reference),
-                To = new IdExpression(to.Text, IdentifierType.Reference)
+                From = new IdExpression(from, IdentifierType.Reference),
+                To = new IdExpression(to, IdentifierType.Reference)
             };
         }
 
@@ -1362,7 +1362,7 @@ namespace BasicPlusParser
 
             return new OsReadStatement
             {
-                Variable = new IdExpression(variable.Text),
+                Variable = new IdExpression(variable),
                 Else = elseBlock,
                 FilePath = filePath,
                 Then = thenBlock
@@ -1384,7 +1384,7 @@ namespace BasicPlusParser
                 }
                 
                 ConsumeToken(typeof(RParenToken));
-                Matrix matrix = new Matrix(matVar.Text, col, row);
+                Matrix matrix = new Matrix(matVar, col, row);
                 matricies.Add(matrix);
 
                 if (!SymbolTable.ContainsEquateOrVaraible(matVar)) {
@@ -1491,7 +1491,7 @@ namespace BasicPlusParser
                 }
 
 
-                globalVars.Add(new IdExpression(name.Text));
+                globalVars.Add(new IdExpression(name));
 
             } while (NextTokenIs(typeof(CommaToken)));
 
@@ -1499,7 +1499,7 @@ namespace BasicPlusParser
             SymbolTable.AddCommonLabel(commonBlockId);
             return new CommonStatement
             {
-                CommonName = new IdExpression(commonBlockId.Text),
+                CommonName = new IdExpression(commonBlockId),
                 GlovalVars = globalVars
             };
         }
@@ -1555,7 +1555,7 @@ namespace BasicPlusParser
             {
                 Key = key,
                 TableVar = tableVar,
-                Variable = new IdExpression(variable.Text),
+                Variable = new IdExpression(variable),
                 Else = elseBlock,
                 Then = thenBlock,
                 Cursor = cursor
@@ -1580,7 +1580,7 @@ namespace BasicPlusParser
                 Column  = col,
                 Key = key,
                 TableVar = tableVar,
-                Variable = new IdExpression(variable.Text),
+                Variable = new IdExpression(variable),
                 Else = elseBlock,
                 Then = thenBlock
             };
@@ -1600,8 +1600,8 @@ namespace BasicPlusParser
             return new MatParseStatement
             {
                 Delim = delim,
-                Matrix = new IdExpression(matrixVar.Text),
-                Variable = new IdExpression(variable.Text)
+                Matrix = new IdExpression(matrixVar),
+                Variable = new IdExpression(variable)
             };
         }
 
@@ -1642,7 +1642,7 @@ namespace BasicPlusParser
             Token label = ConsumeIdToken();
             return new FreeCommonStatement
             {
-                Variable = new IdExpression(label.Text,identifierType: IdentifierType.Reference)
+                Variable = new IdExpression(label,identifierType: IdentifierType.Reference)
             };
         }
 
@@ -1652,7 +1652,7 @@ namespace BasicPlusParser
 
             return new OsCloseStatement
             {
-                FileVar = new IdExpression(variable.Text, IdentifierType.Reference)
+                FileVar = new IdExpression(variable, IdentifierType.Reference)
             };
         }
 
@@ -1678,7 +1678,7 @@ namespace BasicPlusParser
             {
                 Byte = @byte,
                 Expr = expr,
-                Variable = new IdExpression(fileVar.Text, IdentifierType.Reference)
+                Variable = new IdExpression(fileVar, IdentifierType.Reference)
             };
         }
 
@@ -1694,9 +1694,9 @@ namespace BasicPlusParser
             return new OsBreadStatement
             {
                 Byte = byt,
-                FileVariable = new IdExpression(fileVar.Text, IdentifierType.Reference), 
+                FileVariable = new IdExpression(fileVar, IdentifierType.Reference), 
                 Length = length,
-                Variable = new IdExpression(variable.Text)
+                Variable = new IdExpression(variable)
             };
         }
 
@@ -1711,10 +1711,10 @@ namespace BasicPlusParser
             Token flag = ConsumeIdToken();
             return new BRemoveStatement
             {
-                Variable = new IdExpression(variable.Text),
+                Variable = new IdExpression(variable),
                 From = from,
-                Pos = new IdExpression(pos.Text),
-                Flag = new IdExpression(flag.Text)
+                Pos = new IdExpression(pos),
+                Flag = new IdExpression(flag)
             };
         }
 
@@ -1744,7 +1744,7 @@ namespace BasicPlusParser
                 Value = value,
                 Col = col,
                 Row = row,
-                Variable = new IdExpression(token.Text, IdentifierType.Assignment)
+                Variable = new IdExpression(token, IdentifierType.Assignment)
             };
         }
 
@@ -1767,7 +1767,7 @@ namespace BasicPlusParser
             return new OsOpenStatement
             {
                 FilePath = filePath,
-                Variable = new IdExpression(variable.Text),
+                Variable = new IdExpression(variable),
                 Else = elseBlock,
                 Then = thenBlock
             };
@@ -2020,7 +2020,7 @@ namespace BasicPlusParser
                 }
                 else
                 {
-                    expr = new IdExpression(token.Text, IdentifierType.Reference);
+                    expr = new IdExpression(token, IdentifierType.Reference);
                     SymbolTable.AddVariableReference(token);
                 }
             }
@@ -2087,11 +2087,11 @@ namespace BasicPlusParser
             else
             {
                 // TODO make new reference type.
-                memberExpr = new IdExpression(memberToken.Text, IdentifierType.Assignment);
+                memberExpr = new IdExpression(memberToken, IdentifierType.Assignment);
             }
 
             SymbolTable.AddVariableReference(token);
-            return new OleExpression { Object = new IdExpression(token.Text, IdentifierType.Reference), Member = memberExpr };
+            return new OleExpression { Object = new IdExpression(token, IdentifierType.Reference), Member = memberExpr };
 
         }
 
@@ -2228,7 +2228,7 @@ namespace BasicPlusParser
                     {
                         _parseErrors.ReportError(matrix, $"The identifier {matrix.Text} must be dimensioned.");
                     }
-                    arg = new IdExpression(matrix.Text, IdentifierType.Reference);
+                    arg = new IdExpression(matrix, IdentifierType.Reference);
                 } else
                 {
                     arg = ParseExpr();
@@ -2240,7 +2240,7 @@ namespace BasicPlusParser
 
                 args.Add(arg);
             }
-            return new FuncExpression { Args = args, Function = new IdExpression(token.Text, IdentifierType.Function) };
+            return new FuncExpression { Args = args, Function = new IdExpression(token, IdentifierType.Function) };
         }
 
         Expression ParseMatrixIndexExpression(Token token)
@@ -2260,7 +2260,7 @@ namespace BasicPlusParser
             SymbolTable.AddVariableReference(token);
 
             return new MatrixIndexExpression { Col = col, Row = row, 
-                Name = new IdExpression(token.Text, IdentifierType.Reference) };
+                Name = new IdExpression(token, IdentifierType.Reference) };
         }
 
         Token PeekNextToken(int lookAhead = 0)

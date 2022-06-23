@@ -1,4 +1,5 @@
 ﻿using BasicPlusParser.Statements;
+using BasicPlusParser.Tokens;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -9,7 +10,7 @@ namespace BasicPlusParser.Analyser
         Procedure _prog;
 
 
-        public List<(string, Statement)> UnassignedVars = new();
+        public List<(Token, Statement)> UnassignedVars = new();
 
         //When we take a goto or gosub statement, store the statement so we don't take it again (to avoid infinite recursion)
         readonly List<Statement> JumpsTaken = new();
@@ -20,12 +21,12 @@ namespace BasicPlusParser.Analyser
             _prog = prog;
         }
 
-        public (bool, HashSet<string>) AnalyseCore(IEnumerable<Statement> statements, HashSet<string> env = null)
+        public (bool, HashSet<Token>) AnalyseCore(IEnumerable<Statement> statements, HashSet<Token> env = null)
         {
 
             bool branchReturns = false;
-            HashSet<string> definiteLocalScope = new();
-            HashSet<string> definiteOuterScope = new();
+            HashSet<Token> definiteLocalScope = new(new TokenEqualityComparer());
+            HashSet<Token> definiteOuterScope = new(new TokenEqualityComparer());
             if (env != null)
             {
                 definiteLocalScope.UnionWith(env);
@@ -41,7 +42,12 @@ namespace BasicPlusParser.Analyser
 
                 foreach (var err in statement.GetReferencedVars().Where(v => !definiteLocalScope.Contains(v)))
                 {
-                    UnassignedVars.Add((err, statement));
+                    // Don't report the same error twice.
+                    if (!UnassignedVars.Any(x => object.ReferenceEquals(x.Item1, err)))
+                    {
+                        UnassignedVars.Add((err, statement));
+                    }
+
                 }
 
                 switch (statement)
@@ -50,7 +56,7 @@ namespace BasicPlusParser.Analyser
                         return (true, definiteOuterScope);
 
                     case GoToStatement s:
-                        if (!JumpsTaken.Contains(s))
+                        if (!JumpsTaken.Any(x=> object.ReferenceEquals(s,x)))
                         {
                             JumpsTaken.Add(s);
                             (var gotReturns, var gotoVars) = AnalyseCore(_prog.SymbolTable.Labels[s.Label.Name].StatementsFollowingLabel, definiteLocalScope);
@@ -62,8 +68,8 @@ namespace BasicPlusParser.Analyser
                     case ThenElseStatement s:
                         (var thenReturns, var thenVars) = AnalyseCore(s.Then, definiteLocalScope);
                         (var elseReturns, var elseVars) = AnalyseCore(s.Else, definiteLocalScope);
-                        definiteOuterScope.UnionWith(thenVars.Intersect(elseVars));
-                        if (!thenReturns && !elseReturns) definiteLocalScope.UnionWith(thenVars.Intersect(elseVars));
+                        definiteOuterScope.UnionWith(thenVars.Intersect(elseVars,new TokenEqualityComparer()));
+                        if (!thenReturns && !elseReturns) definiteLocalScope.UnionWith(thenVars.Intersect(elseVars, new TokenEqualityComparer()));
                         if (!elseReturns && thenReturns) definiteLocalScope.UnionWith(elseVars);
                         if (elseReturns && !thenReturns) definiteLocalScope.UnionWith(thenVars);
                         if (thenReturns && elseReturns) return (true, definiteOuterScope);
@@ -94,7 +100,7 @@ namespace BasicPlusParser.Analyser
                         }
                         break;
                     case GosubStatement s:
-                        if (!JumpsTaken.Contains(s))
+                        if (!JumpsTaken.Any(x => object.ReferenceEquals(s, x)))
                         {
                             JumpsTaken.Add(s);
                             var stmtsAfterLabel = _prog.SymbolTable.Labels[s.Label.Name].StatementsFollowingLabel;
@@ -111,7 +117,8 @@ namespace BasicPlusParser.Analyser
 
         public  void Analyse()
         {
-            HashSet<string> env = new();
+            //HashSet<string> env = new();
+            /*
             // Todo, need to take into account inserts so we don't have to harcode these values...
             env.Add("true$");
             env.Add("false$");
@@ -122,8 +129,9 @@ namespace BasicPlusParser.Analyser
             env.Add("param1");
             env.Add("focus");
             env.Add("event");
+            */
 
-            AnalyseCore(_prog.Statements,env);
+            AnalyseCore(_prog.Statements);
         }
     }
 }
