@@ -987,7 +987,7 @@ namespace BasicPlusParser
                 SymbolTable.AddEquateDeclaration(var, val);
             } else
             {
-                _parseErrors.ReportError(var, $"The symol {var.Text} has already been defined.");
+                _parseErrors.ReportError(var, $"The symbol {var.Text} has already been defined.");
             }
             return new EquStatemnet
             {
@@ -2153,7 +2153,7 @@ namespace BasicPlusParser
             {
                 if (indexes.Count >3)
                 {
-                    _parseErrors.ReportError(token, $"Array {token.Text} has more than 3 indexes.");
+                    _parseErrors.ReportError(((IdExpression)baseExpr).Token, $"Array {((IdExpression)baseExpr).Token.Text} has more than 3 indexes.");
                 }
                 _nextTokenIndex += 1;
                 return new AngleArrExpression { Indexes = indexes, Source = baseExpr };
@@ -2178,7 +2178,7 @@ namespace BasicPlusParser
 
             if (indexes.Count > 2)
             {
-                _parseErrors.ReportError(token, $"Array {token.Text} has more than 2 indexes.");
+                _parseErrors.ReportError(((IdExpression)expr).Token, $"Array {((IdExpression)expr).Token.Text} has more than 2 indexes.");
             }
 
             ConsumeToken(typeof(RSqrBracketToken));
