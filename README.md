@@ -12,7 +12,7 @@ UnreachableCodeAnalyser analyser = new UnreachableCodeAnalyser(program);
 analyser.Analyse();
 ```
 The parser also contains an implementation of the language server protocol, which means you can use the parser in any IDE that implements the language server protocol, for example Visual Studio Code:
-![image](https://user-images.githubusercontent.com/87922814/174413924-5ae55d50-889d-4a5a-a9c1-e763c4c46e46.png)
+<img width="485" alt="image" src="https://user-images.githubusercontent.com/87922814/175318139-90dd1d58-3639-45e0-8741-305b2fde6547.png">
 
 
 + The unassigned variable analyser can't handle the case when a label spans several blocks. 99.999% of code does not contain such labels, but there are some weird programs created decades ago that do ... Anyway, there is a way to make the unassiagned variable analyser handle this case.
