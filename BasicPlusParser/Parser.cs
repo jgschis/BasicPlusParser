@@ -1827,7 +1827,7 @@ namespace BasicPlusParser
                 typeof(HashTagToken), typeof(GeToken), typeof(LteToken),typeof(EqToken),typeof(NeToken),
                 typeof(LtToken),typeof(LeToken),typeof(GtToken),typeof(EqcToken),typeof(NecToken),
                 typeof(LtcToken),typeof(LecToken),typeof(GtcToken),typeof(GecToken),typeof(EqxToken),
-                typeof(NexToken),typeof(LtxToken),typeof(GtxToken),typeof(LexToken),typeof(GexToken)))
+                typeof(NexToken),typeof(LtxToken),typeof(GtxToken),typeof(LexToken),typeof(GexToken), typeof(ExclamToken)))
             {
                 if (optoken is RAngleBracketToken && inArray)
                 {
@@ -1860,7 +1860,7 @@ namespace BasicPlusParser
                 {
                     expr = new GtExpression { Left = expr, Right = right, Operator = optoken.Text };
                 }
-                else if (optoken is ExcalmEqToken || optoken is HashTagToken || optoken is NeToken || optoken is NexToken || optoken is NecToken )
+                else if (optoken is ExcalmEqToken || optoken is HashTagToken || optoken is NeToken || optoken is NexToken || optoken is NecToken || optoken is ExclamToken)
                 {
                     expr = new NotEqExpression { Left = expr, Right = right, Operator = optoken.Text };
                 }
