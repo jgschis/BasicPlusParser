@@ -18,5 +18,12 @@ The parser also contains an implementation of the language server protocol, whic
 
 
 
+TODO
+-----
+* Make the parser aware of the various "System Variables"
+* Make the parser capable of reading INSERT files.
+* Integrate the parser with OI.
+* Add code completion.
+* Add code formatting.
 
 + The unassigned variable analyser can't handle the case when a label spans several blocks. 99.999% of code does not contain such labels, but there are some weird programs created decades ago that do ... Anyway, there is a way to make the unassiagned variable analyser handle this case.
