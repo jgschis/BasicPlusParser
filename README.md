@@ -1,4 +1,4 @@
-This is a parser for the Basic + language (of Open Insight). The parser creates a syntax tree out of a file of Basic + source code. The parser is also capable of detecting unreachable code and unassigned variables.+ 
+This is a parser for the Basic + language (of Open Insight). The parser creates a syntax tree out of a file of Basic + source code. The parser is also capable of detecting unreachable code and unassigned variables.
 
 
 ``` csharp
@@ -25,5 +25,4 @@ TODO
 * Integrate the parser with OI.
 * Add code completion.
 * Add code formatting.
-
-+ The unassigned variable analyser can't handle the case when a label spans several blocks. 99.999% of code does not contain such labels, but there are some weird programs created decades ago that do ... Anyway, there is a way to make the unassiagned variable analyser handle this case.
+* The unassigned variable analyser can't handle the case when a label spans several blocks (i.e., when a label is in the middle of a for loop). 99.999% of code does not contain such labels, but there are some weird programs created decades ago that do ... Anyway, there is a way to make the unassiagned variable analyser handle this case.
