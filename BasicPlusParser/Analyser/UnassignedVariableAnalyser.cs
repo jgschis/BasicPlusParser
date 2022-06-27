@@ -34,11 +34,6 @@ namespace BasicPlusParser.Analyser
 
             foreach (Statement statement in statements)
             {
-                definiteLocalScope.UnionWith(statement.GetAssignedVars());
-                if (!branchReturns)
-                {
-                    definiteOuterScope.UnionWith(statement.GetAssignedVars());
-                }
 
                 foreach (var err in statement.GetReferencedVars().Where(v => !definiteLocalScope.Contains(v)))
                 {
@@ -49,6 +44,14 @@ namespace BasicPlusParser.Analyser
                     }
 
                 }
+
+
+                definiteLocalScope.UnionWith(statement.GetAssignedVars());
+                if (!branchReturns)
+                {
+                    definiteOuterScope.UnionWith(statement.GetAssignedVars());
+                }
+
 
                 switch (statement)
                 {
