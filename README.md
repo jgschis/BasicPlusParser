@@ -6,7 +6,7 @@ string path = "...";
 string sourceCode = File.ReadAllText(path);
      
 Parser parser = new Parser(sourceCode);
-OiProgram program = parser.Parse();
+Procedure program = parser.Parse();
 
 UnreachableCodeAnalyser analyser = new UnreachableCodeAnalyser(program);
 analyser.Analyse();
