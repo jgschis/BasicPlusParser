@@ -58,10 +58,13 @@ namespace BasicPlusParser.Analyser
                     case GoToStatement s:
                         if (!JumpsTaken.Any(x=> object.ReferenceEquals(s,x)))
                         {
-                            JumpsTaken.Add(s);
-                            (var gotReturns, var gotoVars) = AnalyseCore(_prog.SymbolTable.Labels[s.Label.Name].StatementsFollowingLabel, definiteLocalScope);
-                            definiteOuterScope.UnionWith(gotoVars);
-                            // Goto always (effectively) returns...
+                            if (_prog.SymbolTable.Labels.ContainsKey(s.Label.Name))
+                            {
+                                JumpsTaken.Add(s);
+                                (var gotReturns, var gotoVars) = AnalyseCore(_prog.SymbolTable.Labels[s.Label.Name].StatementsFollowingLabel, definiteLocalScope);
+                                definiteOuterScope.UnionWith(gotoVars);
+                                // Goto always (effectively) returns...
+                            }
                         }
                         return (true, definiteOuterScope);
      
@@ -102,11 +105,13 @@ namespace BasicPlusParser.Analyser
                     case GosubStatement s:
                         if (!JumpsTaken.Any(x => object.ReferenceEquals(s, x)))
                         {
-                            JumpsTaken.Add(s);
-                            var stmtsAfterLabel = _prog.SymbolTable.Labels[s.Label.Name].StatementsFollowingLabel;
-                            (var gosubReturns, var gosubVars) = AnalyseCore(stmtsAfterLabel, definiteLocalScope);
-                            definiteLocalScope.UnionWith(gosubVars);
-                            definiteOuterScope.UnionWith(gosubVars);
+                            if (_prog.SymbolTable.Labels.ContainsKey(s.Label.Name)){
+                                var stmtsAfterLabel = _prog.SymbolTable.Labels[s.Label.Name].StatementsFollowingLabel;
+                                JumpsTaken.Add(s);
+                                (var gosubReturns, var gosubVars) = AnalyseCore(stmtsAfterLabel, definiteLocalScope);
+                                definiteLocalScope.UnionWith(gosubVars);
+                                definiteOuterScope.UnionWith(gosubVars);  
+                            }
                         }
                         break;
 
