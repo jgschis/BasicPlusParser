@@ -25,7 +25,9 @@ namespace BasicPlusParser.Analyser
         {
 
             bool branchReturns = false;
+            // Contains variables that are definitivley assigned in a block
             HashSet<Token> definiteLocalScope = new(new TokenEqualityComparer());
+            // Contains variables that are definitely assigned globally.
             HashSet<Token> definiteOuterScope = new(new TokenEqualityComparer());
             if (env != null)
             {
@@ -44,7 +46,6 @@ namespace BasicPlusParser.Analyser
                     }
 
                 }
-
 
                 definiteLocalScope.UnionWith(statement.GetAssignedVars());
                 if (!branchReturns)
@@ -125,21 +126,8 @@ namespace BasicPlusParser.Analyser
 
         public  void Analyse()
         {
-            //HashSet<string> env = new();
-            /*
-            // Todo, need to take into account inserts so we don't have to harcode these values...
-            env.Add("true$");
-            env.Add("false$");
-            env.Add("@window");
-            env.Add("@svm");
-            env.Add("@vm");
-            env.Add("@fm");
-            env.Add("param1");
-            env.Add("focus");
-            env.Add("event");
-            */
-
-            AnalyseCore(_prog.Statements);
+            HashSet<Token> env = new( _prog.SymbolTable.ProcedureParameters, new TokenEqualityComparer());
+            AnalyseCore(_prog.Statements, env);
         }
     }
 }

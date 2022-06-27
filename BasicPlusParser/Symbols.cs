@@ -9,6 +9,7 @@ namespace BasicPlusParser
 
         public Dictionary<string, Label> Labels = new();
         public List<Token> LabelReferences = new();
+        public List<Token> ProcedureParameters = new();
 
         Dictionary<string, Symbol> _symbols = new();
         public Dictionary<string, Symbol> SymbolIndex = new();
@@ -196,6 +197,7 @@ namespace BasicPlusParser
                 symbol = new Symbol(token, SymbolKind.Variable, VariableScope.Parameter);
             }
             AddSymbol(symbol);
+            ProcedureParameters.Add(token);
         }
     }
 }
