@@ -3,7 +3,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Server;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using Microsoft.Extensions.Logging;
-using Serilog;
 
 namespace BasicPlusLangServer {
 
@@ -34,10 +33,6 @@ namespace BasicPlusLangServer {
 
 		void ConfigureLogging(ILoggingBuilder logBuilder){
 
-
-
-			logBuilder.ClearProviders();
-			logBuilder.AddSerilog(dispose:true);
 		}
 
 		Task Initialize(ILanguageServer server, InitializeParams initializeParams,
