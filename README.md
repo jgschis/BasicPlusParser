@@ -20,6 +20,7 @@ The parser also contains an implementation of the language server protocol, whic
 
 TODO
 -----
+* Change the tokenizer so that you can add several tokens at once.
 * Make the parser capable of reading INSERT files.
 * Integrate the parser with OI.
 * Add code completion.
