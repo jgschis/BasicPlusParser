@@ -16,6 +16,14 @@ uva.Analyse();
 The parser also contains an implementation of the language server protocol, which means you can use the parser in any IDE that implements the language server protocol, for example Visual Studio Code:
 ![image](https://user-images.githubusercontent.com/87922814/175839994-065ceeab-476c-4ef5-abf8-ed7ba597f07d.png)
 
+Features
+----------
+* Syntax highlighting.
+* Unreachable code analysis that can  detect when a statement will never run.
+* Unassigned variable analysis that knows that if a variable is only assigned in one branch of an if statemnet, it's not definitively assigned.
+* Placing cursor over a symbole will tell you info about the symbol. In the case of an equate, it tells you the value of the equate.
+* Code range folding/unfolding
+
 
 
 TODO
