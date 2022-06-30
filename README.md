@@ -20,7 +20,6 @@ The parser also contains an implementation of the language server protocol, whic
 
 TODO
 -----
-* Make the parser aware of the various "System Variables"
 * Make the parser capable of reading INSERT files.
 * Integrate the parser with OI.
 * Add code completion.
