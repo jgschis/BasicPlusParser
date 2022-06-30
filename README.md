@@ -18,6 +18,7 @@ The parser also contains an implementation of the language server protocol, whic
 
 Features
 ----------
+* Reports errors/warnings with code as you type. 
 * Syntax highlighting.
 * Unreachable code analysis that can  detect when a statement will never run.
 * Unassigned variable analysis that knows that if a variable is only assigned in one branch of an if statemnet, it's not definitively assigned.
