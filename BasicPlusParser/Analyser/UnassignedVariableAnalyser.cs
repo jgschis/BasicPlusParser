@@ -42,7 +42,10 @@ namespace BasicPlusParser.Analyser
                     // Don't report the same error twice.
                     if (!UnassignedVars.Any(x => object.ReferenceEquals(x.Item1, err)))
                     {
-                        UnassignedVars.Add((err, statement));
+                        if (err is not SystemVariableToken)
+                        {
+                            UnassignedVars.Add((err, statement));
+                        }
                     }
 
                 }

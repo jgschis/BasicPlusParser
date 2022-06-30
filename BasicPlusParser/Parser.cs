@@ -980,15 +980,28 @@ namespace BasicPlusParser
         Statement ParseEquStatement(Token token)
         {
             Token var = ConsumeIdToken(addIdentifierToSymbolTable:false);
+
+          
+
+
             ConsumeToken(typeof(ToToken));
             Expression val = ParseExpr();
-            if (!SymbolTable.ContainsEquateOrVaraible(var))
+            
+            if (var is SystemVariableToken)
             {
-                SymbolTable.AddEquateDeclaration(var, val);
-            } else
+                _parseErrors.ReportError(var, $"A system variable cannot be equated.");
+
+            }
+            else if (SymbolTable.ContainsEquateOrVaraible(var))
             {
                 _parseErrors.ReportError(var, $"The symbol {var.Text} has already been defined.");
             }
+            else
+            {
+                SymbolTable.AddEquateDeclaration(var, val);
+            }
+
+           
             return new EquStatemnet
             {
                 Variable = new IdExpression(var),
@@ -1322,17 +1335,18 @@ namespace BasicPlusParser
         Statement ParseCallStmt()
         {
             FuncExpression funcExpr;
+            bool useAtOperator = NextTokenIs(typeof(AtOperatorToken));
             Token funcName = ConsumeIdToken();
-            funcName.LsClass = "method";
-            bool declarationRequired = funcName.Text[0] != '@';
+            if (!useAtOperator)
+            {
+                funcName.LsClass = "method";
+
+            }
+
             if (NextTokenIs(typeof(LParenToken))){
-                funcExpr = (FuncExpression)ParseFunc(funcName, mustReturnValue: false, declarationRequired: declarationRequired);
+                funcExpr = (FuncExpression)ParseFunc(funcName, mustReturnValue: false, declarationRequired: false);
             } else
             {
-                if (declarationRequired && !SymbolTable.IsSubroutineDeclared(funcName))
-                {
-                    _parseErrors.ReportError(funcName, $"{funcName.Text} must be declared as a subroutine.");
-                }
                 funcExpr = new FuncExpression { Function = new IdExpression(funcName, IdentifierType.Function), Args = new() };
             }
                 return new CallStatement
@@ -2338,7 +2352,8 @@ namespace BasicPlusParser
         Token ConsumeIdToken(string message = "Identifier expected.", bool addIdentifierToSymbolTable = true)
         {
             Token token = PeekNextToken();
-            if (token.GetType() != typeof(IdentifierToken))
+            if (token is not IdentifierToken)
+            //if (token.GetType() != typeof(IdentifierToken))
             {
                 //_parseErrors.ReportError(token, message);
                 throw Error(token, message);

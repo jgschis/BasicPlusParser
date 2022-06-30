@@ -144,6 +144,8 @@ namespace BasicPlusParser
                     return ScanNumber();
                 case '.':
                     return ScanNumber();
+                case '@':
+                    return ScanSystemVariableOrAtOperator();
                 case '\r':
                     Match('\n');
                     IncrementLineNo();
@@ -176,8 +178,7 @@ namespace BasicPlusParser
         bool IsIdentifierOrKeyWord(char chr)
         {
             return (chr >= 'a' && chr <= 'z') ||
-                    (chr >= 'A' && chr <= 'Z') ||
-                    chr == '_' || chr == '@';
+                    (chr >= 'A' && chr <= 'Z');
         }
 
         bool IsNumber(char chr, bool hexAllowed = false)
@@ -253,10 +254,93 @@ namespace BasicPlusParser
             return new StringToken { Str = str, Delim = delim , Text = _source[start.._pos]};
         }
 
+
+        Token ScanSystemVariableOrAtOperator()
+        {
+            int origPos = _pos;
+            int origCol = _col;
+
+            int start = _pos - 1;
+            while (IsIdentifierOrKeyWord(Peek()) || IsNumber(Peek()) || Peek() == '_' || Peek() == '@' || Peek() == '.' || Peek() == '$')
+            {
+                Advance();
+            }
+
+            string atOperatorOrSystemVariable = _source[start.._pos];
+
+            switch (atOperatorOrSystemVariable.ToLower())
+            {
+                case "@cursors":
+                case "@list_active":
+                case "@pri_file":
+                case "@query_dict":
+                case "@reccount":
+                case "@reduction_done":
+                case "@rn_counter":
+                case "@admin":
+                case "@appid":
+                case "@appinfo":
+                case "@dbid":
+                case "@environ_set":
+                case "@files.system":
+                case "@files_sysdict":
+                case "@files_sysenv":
+                case "@files_sysobj":
+                case "@files_sysptrs":
+                case "@lower_case":
+                case "lptrhigh":
+                case "@lptrwide":
+                case "@mdiactive":
+                case "@mdiframe":
+                case "@printmode":
+                case "@station":
+                case "@system_tables":
+                case "@tables":
+                case "@upper_case":
+                case "@username":
+                case "@volumes":
+                case "@window":
+                case "@default_stops":
+                case "@index.time":
+                case "@hfactive":
+                case "@page":
+                case "@rm":
+                case "@fm":
+                case "@vm":
+                case "@svm":
+                case "@tm":
+                case "@stm":
+                case "@file.error":
+                case "@file_error":
+                case "@file_error_mode":
+                case "@ans":
+                case "@dict":
+                case "@id":
+                case "@mv":
+                case "@record":
+                case "@user0":
+                case "@user1":
+                case "@user2":
+                case "@user3":
+                case "@user4":
+                case "@recur0":
+                case "@recur1":
+                case "@recur2":
+                case "@recur3":
+                case "@recur4":
+                    return new SystemVariableToken { Text = atOperatorOrSystemVariable };
+                default:
+                    // We're not dealing with a system variabe, so let's return the at operator and put the token position to after the at operator.
+                    _pos = origPos;
+                    _col = origCol;
+                    return new AtOperatorToken { Text = atOperatorOrSystemVariable };
+           }
+        }
+
         Token ScanIdentifierOrKeyword()
         {
             int start = _pos - 1;
-            while (IsIdentifierOrKeyWord(Peek()) || IsNumber(Peek()) || Peek() == '.' || Peek() == '$')
+            while (IsIdentifierOrKeyWord(Peek()) || IsNumber(Peek()) || Peek() == '_'  || Peek() == '@' || Peek() == '.' || Peek() == '$')
             {
                 Advance();
             }
@@ -365,7 +449,7 @@ namespace BasicPlusParser
                 "_gex" => new GexToken { Text = idOrKeyword },
                 "and" => new AndToken { Text = idOrKeyword },
                 "or" => new OrToken { Text = idOrKeyword },
-                _ => new IdentifierToken { Text = idOrKeyword },
+                _ => new IdentifierToken { Text = idOrKeyword }      
             };
         }
 

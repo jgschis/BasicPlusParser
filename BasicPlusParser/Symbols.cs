@@ -98,7 +98,6 @@ namespace BasicPlusParser
             AddSymbol(new(token, SymbolKind.Variable,col,row, VariableScope.Common));
         }
 
-
         public void AddSubroutineReference(Token token)
         {
             if (_symbols.TryGetValue(GetSymbolKey(SymbolKind.Subroutine, token), out Symbol symbol))
@@ -172,11 +171,16 @@ namespace BasicPlusParser
                 _symbols.TryGetValue(GetSymbolKey(SymbolKind.Equate, token), out symbol) ||
                 _symbols.TryGetValue(GetSymbolKey(SymbolKind.Variable, token), out symbol);
 
+
             if (found)
             {
                 UpdateIndex(token.LineNo,token.StartCol,symbol);
             } else
             {
+                if (token is SystemVariableToken)
+                {
+                    scope = VariableScope.System;
+                }
                 AddSymbol(new Symbol(token, SymbolKind.Variable, scope: scope));
             }
         }

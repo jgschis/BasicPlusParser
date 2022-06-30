@@ -19,7 +19,6 @@ namespace BasicPlusLangServer
 
         public override Task<Hover?> Handle(HoverParams request, CancellationToken cancellationToken)
         {
-           
             Hover? hover = null;
 
             var doc = _documentManager.GetDocument(request.TextDocument.Uri.ToString());
