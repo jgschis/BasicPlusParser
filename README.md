@@ -24,6 +24,7 @@ Features
 * Unassigned variable analysis that knows that if a variable is only assigned in one branch of an if statemnet, it's not definitively assigned.
 * Placing cursor over a symbole will tell you info about the symbol. In the case of an equate, it tells you the value of the equate.
 * Code range folding/unfolding
+* Pressing f12 on a label, equate, matrix or common variable will take you to where it is defined.
 
 
 
