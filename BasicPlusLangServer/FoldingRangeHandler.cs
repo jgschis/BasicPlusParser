@@ -24,11 +24,7 @@ namespace BasicPlusLangServer
             if (doc != null)
             {
 
-
-                Parser parser = new Parser(doc.Text);
-                parser.Parse();
-
-                foreach (var region in parser.Regions)
+                foreach (var region in doc.Proc.Regions)
                 {
                     foldingRanges.Add(new FoldingRange
                     {

@@ -10,14 +10,14 @@ namespace BasicPlusParser
     public class Parser
     {
         int _nextTokenIndex = 0;
-        public List<Token> _tokens;
-        public List<Token> _commentTokens;
+        readonly List<Token> _tokens;
+        readonly List<Token> _commentTokens;
         Token _nextToken => _nextTokenIndex < _tokens.Count ? _tokens[_nextTokenIndex] : _tokens.Last();
         Token _prevToken => _nextTokenIndex > 0 ? _tokens[_nextTokenIndex - 1] : null;
-   
-        ParseErrors _parseErrors = new();
-        public List<Region> Regions = new();
-        public Symbols SymbolTable = new();
+
+        readonly ParseErrors _parseErrors = new();
+        readonly List<Region> _regions = new();
+        readonly Symbols _symbolTable = new();
 
         public Parser(string text)
         {
@@ -38,7 +38,10 @@ namespace BasicPlusParser
             procedure.Statements = ParseStmts(() => IsAtEnd());
             CheckIfJumpLabelsAreDefined();
             procedure.Errors = _parseErrors;
-            procedure.SymbolTable = SymbolTable;
+            procedure.SymbolTable = _symbolTable;
+            procedure.Regions = _regions;
+            procedure.Tokens = _tokens;
+            procedure.CommentTokens = _commentTokens;
             return procedure;
         }
 
@@ -98,7 +101,7 @@ namespace BasicPlusParser
                         if (NextTokenIs(out Token argNameToken,typeof(IdentifierToken))) {
                             args.Add(argNameToken.Text);
                             argNameToken.LsClass = "parameter";
-                            SymbolTable.AddParameter(argNameToken, isMatrix);
+                            _symbolTable.AddParameter(argNameToken, isMatrix);
                         }
                         else
                         {
@@ -117,7 +120,7 @@ namespace BasicPlusParser
             if (!NextTokenIs(typeof(NewLineToken))){
                 _parseErrors.ReportError(PeekNextToken(),"Procedure delaration must end in a new line.");
             }
-            return new Procedure(procedureType, procedureName, args);
+            return new Procedure(procedureName, procedureType);
         }
 
         public List<Statement> ParseStmts(Func<bool> stop, bool inLoop = false)
@@ -455,7 +458,7 @@ namespace BasicPlusParser
             {
                 case
                     InternalSubStatement s:
-                    SymbolTable.Labels.TryAdd(s.Label.Name, new Label(statements.Count, statements));
+                    _symbolTable.Labels.TryAdd(s.Label.Name, new Label(statements.Count, statements));
                     break;
             }
         }
@@ -574,7 +577,7 @@ namespace BasicPlusParser
                     thenBlock = ParseStmts(_ =>PeekNextToken() is EndToken);
                     Token endToken = ConsumeToken(typeof(EndToken));
 
-                    Regions.Add(new Region(thenToken.LineNo,thenToken.EndCol, endToken.LineNo, endToken.EndCol));
+                    _regions.Add(new Region(thenToken.LineNo,thenToken.EndCol, endToken.LineNo, endToken.EndCol));
                 }
                 else
                 {
@@ -593,7 +596,7 @@ namespace BasicPlusParser
                 {
                     elseBlock = ParseStmts(() => PeekNextToken() is EndToken);
                     Token endToken = ConsumeToken(typeof(EndToken));
-                    Regions.Add(new Region(elseToken.LineNo, elseToken.EndCol, endToken.LineNo, endToken.EndCol));
+                    _regions.Add(new Region(elseToken.LineNo, elseToken.EndCol, endToken.LineNo, endToken.EndCol));
                 }
                 else 
                 {     
@@ -714,7 +717,7 @@ namespace BasicPlusParser
         AssignmentStatement ParseAssignmentStmt(Token token)
         {
             Expression expr = ParseExpr();
-            SymbolTable.AddVariableReference(token);
+            _symbolTable.AddVariableReference(token);
             return new AssignmentStatement { Value = expr, Variable = new IdExpression(token,IdentifierType.Assignment) };
         }
 
@@ -739,10 +742,10 @@ namespace BasicPlusParser
                 functions.Add(new IdExpression(func, IdentifierType.Function));
                 if (pType == ProcedureType.Subroutine)
                 {
-                    SymbolTable.AddSubroutineDeclaation(func);
+                    _symbolTable.AddSubroutineDeclaation(func);
                 } else
                 {
-                    SymbolTable.AddFunctionDeclaration(func);
+                    _symbolTable.AddFunctionDeclaration(func);
                 }
             } while (NextTokenIs(typeof(CommaToken)));
 
@@ -792,7 +795,7 @@ namespace BasicPlusParser
             {
                 Label = new IdExpression(label, IdentifierType.Label),
             };
-            SymbolTable.AddLabelReference(label);
+            _symbolTable.AddLabelReference(label);
             return stmt;
         }
 
@@ -863,7 +866,7 @@ namespace BasicPlusParser
                 Token label = ConsumeIdToken(addIdentifierToSymbolTable:false);
                 label.LsClass = "label";
                 labels.Add(new IdExpression(label, IdentifierType.Label));
-                SymbolTable.AddLabelReference(label);
+                _symbolTable.AddLabelReference(label);
 
             } while (NextTokenIs(typeof(CommaToken)));
 
@@ -923,7 +926,7 @@ namespace BasicPlusParser
 
             ConsumeToken(typeof(EndToken));
             ConsumeToken(typeof(CaseToken));
-            Regions.Add(new Region(token.LineNo,token.EndCol,_prevToken.EndLineNo,_prevToken.EndCol));
+            _regions.Add(new Region(token.LineNo,token.EndCol,_prevToken.EndLineNo,_prevToken.EndCol));
 
             return new CaseStmt
             {
@@ -948,7 +951,7 @@ namespace BasicPlusParser
             ConsumeToken(typeof(RAngleBracketToken));
             ConsumeToken(typeof(EqualToken));
             Expression expr = ParseExpr();
-            SymbolTable.AddVariableReference(token);
+            _symbolTable.AddVariableReference(token);
             return new AngleArrayAssignmentStatement
             {
                 Indexes = indexes,
@@ -992,13 +995,13 @@ namespace BasicPlusParser
                 _parseErrors.ReportError(var, $"A system variable cannot be equated.");
 
             }
-            else if (SymbolTable.ContainsEquateOrVaraible(var))
+            else if (_symbolTable.ContainsEquateOrVaraible(var))
             {
                 _parseErrors.ReportError(var, $"The symbol {var.Text} has already been defined.");
             }
             else
             {
-                SymbolTable.AddEquateDeclaration(var, val);
+                _symbolTable.AddEquateDeclaration(var, val);
             }
 
            
@@ -1025,7 +1028,7 @@ namespace BasicPlusParser
             ConsumeToken(typeof(NewLineToken), optional: true);
             statements = ParseStmts(() => PeekNextToken() is RepeatToken || IsAtEnd(), inLoop: true);
             Token repeatToken = ConsumeToken(typeof(RepeatToken));
-            Regions.Add(new Region(token.LineNo, token.EndCol, repeatToken.LineNo, repeatToken.EndCol));
+            _regions.Add(new Region(token.LineNo, token.EndCol, repeatToken.LineNo, repeatToken.EndCol));
 
             return new LoopRepeatStatement
             {
@@ -1090,7 +1093,7 @@ namespace BasicPlusParser
                 // no significance, so we just eat it.
                 ParseExpr();
             }
-            Regions.Add(new Region(token.LineNo, token.EndCol, _prevToken.LineNo, _prevToken.EndCol));
+            _regions.Add(new Region(token.LineNo, token.EndCol, _prevToken.LineNo, _prevToken.EndCol));
             
             return new ForNextStatement
             {
@@ -1167,7 +1170,7 @@ namespace BasicPlusParser
             ConsumeToken(typeof(RSqrBracketToken));
             ConsumeToken(typeof(EqualToken));
             Expression expr = ParseExpr();
-            SymbolTable.AddVariableReference(token);
+            _symbolTable.AddVariableReference(token);
             return new SquareBracketArrayAssignmentStatement
             {
                 Indexes = indexes,
@@ -1218,12 +1221,12 @@ namespace BasicPlusParser
             //     || PeekNextToken() is EofToken);   
 
 
-            if (SymbolTable.IsLabelDeclared(token)){
+            if (_symbolTable.IsLabelDeclared(token)){
                 _parseErrors.ReportError(token, $"The label {token.Text} has already been defined.");
             }
 
             token.LsClass = "label";
-            SymbolTable.AddLabelDeclaration(token);
+            _symbolTable.AddLabelDeclaration(token);
             return new InternalSubStatement
             {
                 Label = new IdExpression(token,IdentifierType.Label),
@@ -1239,14 +1242,14 @@ namespace BasicPlusParser
             {
                 Label = new IdExpression(label, IdentifierType.Label),
             };
-            SymbolTable.AddLabelReference(label);
+            _symbolTable.AddLabelReference(label);
             return gosubStmt;
         }
 
         Statement ParsePlusAssignmentStmt(Token token)
         {
             Expression expr = ParseExpr();
-            SymbolTable.AddVariableReference(token);
+            _symbolTable.AddVariableReference(token);
             return new PlusAssignmentStatement
             {
                 Value = expr,
@@ -1257,7 +1260,7 @@ namespace BasicPlusParser
         Statement ParseInsertStmt()
         {
             Token insert = ConsumeIdToken(addIdentifierToSymbolTable: false);
-            SymbolTable.AddInsert(insert);
+            _symbolTable.AddInsert(insert);
             return new InsertStatement
             {
                 Name = new IdExpression(insert, IdentifierType.Insert)
@@ -1267,7 +1270,7 @@ namespace BasicPlusParser
         Statement ParseMinusAssignmentStmt(Token token)
         {
             Expression expr = ParseExpr();
-            SymbolTable.AddVariableReference(token);
+            _symbolTable.AddVariableReference(token);
             return new MinusAssignmentStatement
             {
                 Value = expr,
@@ -1278,7 +1281,7 @@ namespace BasicPlusParser
         Statement ParseDivideAssignmentStmt(Token token)
         {
             Expression expr = ParseExpr();
-            SymbolTable.AddVariableReference(token);
+            _symbolTable.AddVariableReference(token);
             return new DivideAssignmentStatement
             {
                 Value = expr,
@@ -1288,7 +1291,7 @@ namespace BasicPlusParser
         Statement ParseMulAssignmentStmt(Token token)
         {
             Expression expr = ParseExpr();
-            SymbolTable.AddVariableReference(token);
+            _symbolTable.AddVariableReference(token);
             return new MulAssignmentStatement
             {
                 Value = expr,
@@ -1315,7 +1318,7 @@ namespace BasicPlusParser
         Statement ParseConcatAssignmentStmt(Token token)
         {
             Expression expr = ParseExpr();
-            SymbolTable.AddVariableReference(token);
+            _symbolTable.AddVariableReference(token);
             return new ConcatAssignmentStatement
             {
                 Value = expr,
@@ -1401,8 +1404,8 @@ namespace BasicPlusParser
                 Matrix matrix = new Matrix(matVar, col, row);
                 matricies.Add(matrix);
 
-                if (!SymbolTable.ContainsEquateOrVaraible(matVar)) {
-                    SymbolTable.AddMatrixDeclaration(matVar, col, row);
+                if (!_symbolTable.ContainsEquateOrVaraible(matVar)) {
+                    _symbolTable.AddMatrixDeclaration(matVar, col, row);
                 } else
                 {
                     _parseErrors.ReportError(matVar, $"The symbol {matVar.Text} has already been defined.");
@@ -1457,7 +1460,7 @@ namespace BasicPlusParser
             }
 
             Token commonBlockId = ConsumeIdToken(addIdentifierToSymbolTable:false);
-            if (SymbolTable.IsCommonBlockNameDefined(commonBlockId)){
+            if (_symbolTable.IsCommonBlockNameDefined(commonBlockId)){
                 _parseErrors.ReportError(commonBlockId, $"The symbol {commonBlockId.Text} has already been defined.");
             }
 
@@ -1488,18 +1491,18 @@ namespace BasicPlusParser
                 }
 
 
-                if (SymbolTable.ContainsEquateOrVaraible(name)){
+                if (_symbolTable.ContainsEquateOrVaraible(name)){
                     _parseErrors.ReportError(name,$"The symbol {name.Text} has already been defined.");
 
                 } else
                 {
                     if (isMatrix)
                     {
-                        SymbolTable.AddCommonDeclaration(name,matCols,matRows);
+                        _symbolTable.AddCommonDeclaration(name,matCols,matRows);
                     }
                     else
                     {
-                        SymbolTable.AddCommonDeclaration(name);
+                        _symbolTable.AddCommonDeclaration(name);
 
                     }
                 }
@@ -1510,7 +1513,7 @@ namespace BasicPlusParser
             } while (NextTokenIs(typeof(CommaToken)));
 
 
-            SymbolTable.AddCommonLabel(commonBlockId);
+            _symbolTable.AddCommonLabel(commonBlockId);
             return new CommonStatement
             {
                 CommonName = new IdExpression(commonBlockId),
@@ -1752,7 +1755,7 @@ namespace BasicPlusParser
             ConsumeToken(typeof(EqualToken));
             Expression value = ParseExpr();
 
-            SymbolTable.AddVariableReference(token);
+            _symbolTable.AddVariableReference(token);
             return new MatAssignmentStatement
             {
                 Value = value,
@@ -2035,7 +2038,7 @@ namespace BasicPlusParser
                 else
                 {
                     expr = new IdExpression(token, IdentifierType.Reference);
-                    SymbolTable.AddVariableReference(token);
+                    _symbolTable.AddVariableReference(token);
                 }
             }
             else if (token is NumberToken)
@@ -2104,7 +2107,7 @@ namespace BasicPlusParser
                 memberExpr = new IdExpression(memberToken, IdentifierType.Assignment);
             }
 
-            SymbolTable.AddVariableReference(token);
+            _symbolTable.AddVariableReference(token);
             return new OleExpression { Object = new IdExpression(token, IdentifierType.Reference), Member = memberExpr };
 
         }
@@ -2206,22 +2209,22 @@ namespace BasicPlusParser
             {
                 if (mustReturnValue)
                 {
-                    if (!SymbolTable.IsFunctionDeclared(token))
+                    if (!_symbolTable.IsFunctionDeclared(token))
                     {
                         _parseErrors.ReportError(token, $"{token.Text} must be declared as a function");
                     } else
                     {
-                        SymbolTable.AddFunctionReference(token);
+                        _symbolTable.AddFunctionReference(token);
                     }
                 }
                 else
                 {
-                    if (!SymbolTable.IsSubroutineDeclared(token))
+                    if (!_symbolTable.IsSubroutineDeclared(token))
                     {
                         _parseErrors.ReportError(token, $"{token.Text} must be declared as a subroutine.");
                     } else
                     {
-                        SymbolTable.AddSubroutineReference(token);
+                        _symbolTable.AddSubroutineReference(token);
                     }
                 }
             }
@@ -2249,6 +2252,7 @@ namespace BasicPlusParser
                     if (arg is IdExpression)
                     {
                         ((IdExpression)arg).IdentifierType = IdentifierType.Assignment;
+                  
                     }
                 }
 
@@ -2271,7 +2275,7 @@ namespace BasicPlusParser
             }
             ConsumeToken(typeof(RParenToken));
 
-            SymbolTable.AddVariableReference(token);
+            _symbolTable.AddVariableReference(token);
 
             return new MatrixIndexExpression { Col = col, Row = row, 
                 Name = new IdExpression(token, IdentifierType.Reference) };
@@ -2358,7 +2362,7 @@ namespace BasicPlusParser
                 //_parseErrors.ReportError(token, message);
                 throw Error(token, message);
             }
-            if (addIdentifierToSymbolTable) SymbolTable.AddVariableReference(token);
+            if (addIdentifierToSymbolTable) _symbolTable.AddVariableReference(token);
             return _tokens[_nextTokenIndex++];
         }
 
@@ -2396,7 +2400,7 @@ namespace BasicPlusParser
 
         bool IsMatrix(Token token)
         {
-            return SymbolTable.IsMatrix(token);
+            return _symbolTable.IsMatrix(token);
         }
 
         void ConsumeSemiColonsUntilEndOfLine()
@@ -2422,9 +2426,9 @@ namespace BasicPlusParser
         public void CheckIfJumpLabelsAreDefined()
         {
             string errMsg = "The label {0} has not been defined.";
-            foreach(var token in SymbolTable.LabelReferences)
+            foreach(var token in _symbolTable.LabelReferences)
             {
-               if (!SymbolTable.IsLabelDeclared(token))
+               if (!_symbolTable.IsLabelDeclared(token))
                 {
                     _parseErrors.ReportError(token, String.Format(errMsg, token.Text));
                 }

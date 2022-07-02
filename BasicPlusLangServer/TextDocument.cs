@@ -1,9 +1,6 @@
-﻿using OmniSharp.Extensions.LanguageServer.Protocol;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using BasicPlusParser;
+using OmniSharp.Extensions.LanguageServer.Protocol;
+
 
 namespace BasicPlusLangServer
 {
@@ -12,5 +9,6 @@ namespace BasicPlusLangServer
         public string Text;
         public DocumentUri Uri;
         public int? Version;
+        public Procedure Proc;
     }
 }

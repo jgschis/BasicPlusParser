@@ -37,10 +37,11 @@ namespace BasicPlusLangServer
             if (document != null)
             {
                 document.Text = text;
+                Procedure proc = ValidateDocument(document);
+                document.Proc = proc;
                 _documents.UpdateDocument(document);
-                ValidateDocument(document);
             }
-            
+
             return Unit.Task;
         }
 
@@ -48,23 +49,21 @@ namespace BasicPlusLangServer
         public override Task<Unit> Handle(DidOpenTextDocumentParams parms, CancellationToken token){
 
             var doc = new TextDocument { Text = parms.TextDocument.Text, Uri = parms.TextDocument.Uri, Version = parms.TextDocument.Version };
-            _documents.UpdateDocument(new TextDocument { Text= parms.TextDocument.Text, Uri = parms.TextDocument.Uri,Version = parms.TextDocument.Version});
-            ValidateDocument(doc);
+            Procedure procedure = ValidateDocument(doc);
+            _documents.UpdateDocument(new TextDocument { Text = parms.TextDocument.Text, Uri = parms.TextDocument.Uri, Version = parms.TextDocument.Version,Proc = procedure  });
 
             return Unit.Task;
         }
         public override Task<Unit> Handle(DidSaveTextDocumentParams parms, CancellationToken token){
-           
+      
             return Unit.Task;
         }
 
         public override TextDocumentAttributes GetTextDocumentAttributes(DocumentUri documentUri){
-            _logger.LogInformation("GetTextDocumentAttributes completed");
             return new TextDocumentAttributes(documentUri, "txt");
         }
 
         protected override TextDocumentSyncRegistrationOptions CreateRegistrationOptions(SynchronizationCapability syncCaps, ClientCapabilities clientCaps){
-           _logger.LogInformation("CreateRegistrationOptions completed");
            return new TextDocumentSyncRegistrationOptions{
                 Change = TextDocumentSyncKind.Full,
                 Save = new SaveOptions() { IncludeText = true },
@@ -72,7 +71,7 @@ namespace BasicPlusLangServer
            };
         }
 
-        void ValidateDocument(TextDocument textDocument)
+        Procedure ValidateDocument(TextDocument textDocument)
         {
             Parser parser = new Parser(textDocument.Text);
             Procedure program = parser.Parse();
@@ -145,6 +144,8 @@ namespace BasicPlusLangServer
                 Uri = textDocument.Uri,
                 Version = textDocument.Version
             });
+
+            return program;
         }
     }
 }

@@ -22,10 +22,13 @@ namespace BasicPlusParser.Analyser
         public (bool, HashSet<Token>) AnalyseCore(IEnumerable<Statement> statements, HashSet<Token> env = null)
         {
             bool branchReturns = false;
-            // Contains variables that are definitivley assigned in a block
+            // Contains variables that are definitivley assigned in the current block being analysed.
             HashSet<Token> definiteLocalScope = new(new TokenEqualityComparer());
-            // Contains variables that are definitely assigned globally.
+            // Contains variables that are definitely assigned in the current block being analysed that came from another block.
             HashSet<Token> definiteOuterScope = new(new TokenEqualityComparer());
+            // A block is the smallest unit of code that is not guaranteed to be executed. 
+            // For example, each branch of an if statement is a block.
+
             if (env != null)
             {
                 definiteLocalScope.UnionWith(env);

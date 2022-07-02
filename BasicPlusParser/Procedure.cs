@@ -9,14 +9,16 @@ namespace BasicPlusParser
         public string Name;
         public ProcedureType PType;
         public List<Statement> Statements = new();
-        public ParseErrors Errors;
+        public ParseErrors Errors = new();
         public Symbols SymbolTable = new();
-
+        public List<Region> Regions = new();
+        public List<Token> Tokens = new();
+        public List<Token> CommentTokens = new();
 
         // If the file is empty, return a "blank" program.
         public Procedure() { }
         
-        public Procedure(ProcedureType pType, string name, List<string> args)
+        public Procedure(string name, ProcedureType pType)
         {
             PType = pType;
             Name = name;

@@ -24,12 +24,8 @@ namespace BasicPlusLangServer
             var doc = _documentManager.GetDocument(request.TextDocument.Uri.ToString());
             if (doc != null)
             {
-                Parser parser = new Parser(doc.Text);
-                parser.Parse();
-
-
-                var token = FindClosestToken(parser._tokens, request.Position.Line + 1, request.Position.Character);
-                if (!parser.SymbolTable.SymbolIndex.TryGetValue($"{token.LineNo}.{token.StartCol}", out Symbol symbol))
+                var token = FindClosestToken(doc.Proc.Tokens, request.Position.Line + 1, request.Position.Character);
+                if (!doc.Proc.SymbolTable.SymbolIndex.TryGetValue($"{token.LineNo}.{token.StartCol}", out Symbol symbol))
                 {
                     return Task.FromResult<Hover?>(null);
                 }

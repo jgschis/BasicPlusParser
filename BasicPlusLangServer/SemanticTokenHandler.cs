@@ -46,33 +46,30 @@ namespace BasicPlusLangServer
             if (doc != null)
             {
 
-                Parser parser = new Parser(doc.Text);
-                parser.Parse();
-
                 // Unfortunately the highligting of tokens must be applied in the order in which the tokens appear.
                 // That means we need to merge the two token lists together.
                 int i = 0;
                 int j = 0;
                 while (true)
                 {
-                    if (i < parser._tokens.Count && j < parser._commentTokens.Count)
+                    if (i < doc.Proc.Tokens.Count && j < doc.Proc.CommentTokens.Count)
                     {
-                        if (parser._tokens[i].Pos < parser._commentTokens[j].Pos)
+                        if (doc.Proc.Tokens[i].Pos < doc.Proc.CommentTokens[j].Pos)
                         {
-                            ApplyHighlightingToToken(parser._tokens[i++], builder);
+                            ApplyHighlightingToToken(doc.Proc.Tokens[i++], builder);
                         }
                         else
                         {
-                            ApplyHighlightingToToken(parser._commentTokens[j++], builder);
+                            ApplyHighlightingToToken(doc.Proc.CommentTokens[j++], builder);
                         }
                     } 
-                    else if (i < parser._tokens.Count)
+                    else if (i < doc.Proc.Tokens.Count)
                     {
-                        ApplyHighlightingToToken(parser._tokens[i++], builder);
+                        ApplyHighlightingToToken(doc.Proc.Tokens[i++], builder);
                     }
-                    else if (j < parser._commentTokens.Count)
+                    else if (j < doc.Proc.CommentTokens.Count)
                     {
-                        ApplyHighlightingToToken(parser._commentTokens[j++], builder);
+                        ApplyHighlightingToToken(doc.Proc.CommentTokens[j++], builder);
                     }
                     else
                     {
