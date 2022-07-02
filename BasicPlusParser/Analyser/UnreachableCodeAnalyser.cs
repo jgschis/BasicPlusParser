@@ -25,6 +25,7 @@ namespace BasicPlusParser.Analyser
             
             // Does the block we are currently analysing unconditionally return?
             // If so, every subsequent statement is unreachable.
+            // Also, build a graph of labels and gosubs, so that we can detect unreachable labels. 
             bool blockReturns = false;
 
             foreach (Statement statement in statements)
@@ -104,7 +105,6 @@ namespace BasicPlusParser.Analyser
                 }
             }
         }
-
         void AnalyseReachabilityGraph()
         {
             AnalyseReachabilityGraphCore(START);
