@@ -26,7 +26,7 @@ namespace BasicPlusParser
 
         public Symbol GetSymbol(int lineNo, int col)
         {
-            Symbol symbol;
+            SymbolReference symbolRef;
             int min = 0;
             int max = Tokens.Count;
             int index = 0;
@@ -35,10 +35,10 @@ namespace BasicPlusParser
                 index = ((max - min) / 2) + min;
 
                 Token token = Tokens[index];
-                if (token.LineNo == lineNo && token.StartCol <= col && token.EndCol >= col && SymbolTable.SymbolIndex.TryGetValue($"{token.LineNo}.{token.StartCol}", out symbol))
+                if (token.LineNo == lineNo && token.StartCol <= col && token.EndCol >= col && SymbolTable.SymbolIndex.TryGetValue($"{token.LineNo}.{token.StartCol}", out symbolRef))
                 {
                     // Return exact match
-                    return symbol;
+                    return symbolRef.Symbol;
                 }
                 else if (token.LineNo < lineNo || (token.LineNo == lineNo && token.StartCol < col))
                 {
@@ -50,8 +50,8 @@ namespace BasicPlusParser
                 }
             }
             // Return closest match
-            SymbolTable.SymbolIndex.TryGetValue($"{Tokens[index].LineNo}.{Tokens[index].StartCol}", out symbol);
-            return symbol;
+            SymbolTable.SymbolIndex.TryGetValue($"{Tokens[index].LineNo}.{Tokens[index].StartCol}", out symbolRef);
+            return symbolRef?.Symbol;
         }       
     }
 }

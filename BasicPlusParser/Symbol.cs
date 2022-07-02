@@ -1,5 +1,6 @@
 ﻿using BasicPlusParser.Statements.Expressions;
 using BasicPlusParser.Tokens;
+using System.Collections.Generic;
 
 namespace BasicPlusParser
 {
@@ -38,6 +39,7 @@ namespace BasicPlusParser
         public Expression MatrixRows;
         public readonly Expression EquateValue;
         public bool LabelDeclared = false;
+        public List<SymbolReference> References = new();
 
         public Symbol(Token token, SymbolKind kind)
         {

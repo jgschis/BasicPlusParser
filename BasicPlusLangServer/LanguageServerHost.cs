@@ -22,6 +22,7 @@ namespace BasicPlusLangServer {
 				.WithHandler<FoldingRangeHandler>()
 				.WithHandler<HoverHandler>()
 				.WithHandler<DefinitionHandler>()
+				.WithHandler<ReferencesHandler>()
 				.WithServices(ConfigureServices)
 				.OnInitialize(Initialize);
 		}

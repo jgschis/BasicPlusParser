@@ -6,17 +6,16 @@ namespace BasicPlusParser
 {
     public class Symbols
     {
-
         public Dictionary<string, Label> Labels = new();
         public List<Token> LabelReferences = new();
         public List<Token> ProcedureParameters = new();
 
         Dictionary<string, Symbol> _symbols = new();
-        public Dictionary<string, Symbol> SymbolIndex = new();
+        public Dictionary<string, SymbolReference> SymbolIndex = new();
 
         bool AddSymbol(Symbol symbol)
         {
-            UpdateIndex(symbol);
+            UpdateIndex(symbol.Token,symbol);
             return _symbols.TryAdd(GetSymbolKey(symbol.Kind,symbol.Token), symbol);
         }
 
@@ -30,15 +29,12 @@ namespace BasicPlusParser
             return $"{kind}.{name.ToLower()}";
         }
 
-        void UpdateIndex(Symbol symbol)
+        void UpdateIndex(Token token, Symbol symbol)
         {
-            UpdateIndex(symbol.Token.LineNo, symbol.Token.StartCol, symbol);
-        }
-
-        void UpdateIndex(int lineNo,int lineCol, Symbol symbol)
-        {
-            string key = $"{lineNo}.{lineCol}";
-            SymbolIndex.TryAdd(key, symbol);
+            SymbolReference reference = new SymbolReference(symbol, token);
+            string key = $"{token.LineNo}.{token.StartCol}";
+            SymbolIndex.TryAdd(key, reference);
+            symbol.References.Add(reference);
         }
 
         public void AddFunctionDeclaration(Token token)
@@ -76,7 +72,7 @@ namespace BasicPlusParser
             {
                 symbol.LabelDeclared = true;
                 symbol.Token = token;
-                UpdateIndex(token.LineNo, token.StartCol, symbol);
+                UpdateIndex(token, symbol);
             }
         }
 
@@ -103,7 +99,7 @@ namespace BasicPlusParser
         {
             if (_symbols.TryGetValue(GetSymbolKey(SymbolKind.Subroutine, token), out Symbol symbol))
             {
-                UpdateIndex(token.LineNo, token.StartCol, symbol);
+                UpdateIndex(token, symbol);
             }
         }
 
@@ -111,7 +107,7 @@ namespace BasicPlusParser
         {
             if (_symbols.TryGetValue(GetSymbolKey(SymbolKind.Function,token),out Symbol symbol))
             {
-                UpdateIndex(token.LineNo,token.StartCol,symbol);
+                UpdateIndex(token, symbol);
             }
         }
 
@@ -123,7 +119,7 @@ namespace BasicPlusParser
                 AddSymbol(symbol);
             }
             else { 
-                UpdateIndex(token.LineNo, token.StartCol, symbol);
+                UpdateIndex(token, symbol);
             }
 
             LabelReferences.Add(token);
@@ -175,7 +171,7 @@ namespace BasicPlusParser
 
             if (found)
             {
-                UpdateIndex(token.LineNo,token.StartCol,symbol);
+                UpdateIndex(token, symbol);
             } else
             {
                 if (token is SystemVariableToken)
@@ -204,7 +200,6 @@ namespace BasicPlusParser
             }
             AddSymbol(symbol);
             ProcedureParameters.Add(token);
-            token.LsClass = "parameter";
         }
     }
 }
