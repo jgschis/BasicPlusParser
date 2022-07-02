@@ -23,5 +23,35 @@ namespace BasicPlusParser
             PType = pType;
             Name = name;
         }
+
+        public Symbol GetSymbol(int lineNo, int col)
+        {
+            Symbol symbol;
+            int min = 0;
+            int max = Tokens.Count;
+            int index = 0;
+            while (min <= max)
+            {
+                index = ((max - min) / 2) + min;
+
+                Token token = Tokens[index];
+                if (token.LineNo == lineNo && token.StartCol <= col && token.EndCol >= col && SymbolTable.SymbolIndex.TryGetValue($"{token.LineNo}.{token.StartCol}", out symbol))
+                {
+                    // Return exact match
+                    return symbol;
+                }
+                else if (token.LineNo < lineNo || (token.LineNo == lineNo && token.StartCol < col))
+                {
+                    min = index + 1;
+                }
+                else
+                {
+                    max = index - 1;
+                }
+            }
+            // Return closest match
+            SymbolTable.SymbolIndex.TryGetValue($"{Tokens[index].LineNo}.{Tokens[index].StartCol}", out symbol);
+            return symbol;
+        }       
     }
 }

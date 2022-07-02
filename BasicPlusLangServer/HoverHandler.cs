@@ -1,6 +1,5 @@
 ﻿using BasicPlusParser;
 using BasicPlusParser.Statements.Expressions;
-using BasicPlusParser.Tokens;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -24,8 +23,8 @@ namespace BasicPlusLangServer
             var doc = _documentManager.GetDocument(request.TextDocument.Uri.ToString());
             if (doc != null)
             {
-                var token = FindClosestToken(doc.Proc.Tokens, request.Position.Line + 1, request.Position.Character);
-                if (!doc.Proc.SymbolTable.SymbolIndex.TryGetValue($"{token.LineNo}.{token.StartCol}", out Symbol symbol))
+                Symbol symbol = doc.Proc.GetSymbol(request.Position.Line + 1, request.Position.Character);
+                if (symbol == null)
                 {
                     return Task.FromResult<Hover?>(null);
                 }
@@ -87,38 +86,6 @@ namespace BasicPlusLangServer
             }
             return Task.FromResult(hover);
         }
-
-
-        Token FindClosestToken(List<Token> tokens,int lineNo, int lineCol)
-        {
-            int min = 0;
-            int max = tokens.Count;
-            int index = 0;
-            while (min<=max)
-            {
-                 index = ((max - min) / 2) + min;
-
-                Token token = tokens[index];
-                if (token.LineNo == lineNo && token.StartCol <= lineCol && token.EndCol >= lineCol)
-                {
-                    // Return exact match
-                    return token;
-                }
-                else if (token.LineNo < lineNo || (token.LineNo == lineNo && token.StartCol < lineCol))
-                {
-                    min = index + 1;
-                }
-                else
-                {
-                    max = index - 1;
-                }
-
-            }
-            // Return closest match
-            return tokens[index];
-        }
-
-
 
         protected override HoverRegistrationOptions CreateRegistrationOptions(HoverCapability capability, ClientCapabilities clientCapabilities)
         {

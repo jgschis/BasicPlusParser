@@ -75,6 +75,7 @@ namespace BasicPlusParser
             else
             {
                 symbol.LabelDeclared = true;
+                symbol.Token = token;
                 UpdateIndex(token.LineNo, token.StartCol, symbol);
             }
         }
@@ -183,6 +184,7 @@ namespace BasicPlusParser
                 }
                 AddSymbol(new Symbol(token, SymbolKind.Variable, scope: scope));
             }
+
         }
 
         public bool IsCommonBlockNameDefined(Token token)
@@ -202,6 +204,7 @@ namespace BasicPlusParser
             }
             AddSymbol(symbol);
             ProcedureParameters.Add(token);
+            token.LsClass = "parameter";
         }
     }
 }
