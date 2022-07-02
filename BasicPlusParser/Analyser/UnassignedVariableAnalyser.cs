@@ -7,15 +7,13 @@ namespace BasicPlusParser.Analyser
 {
     public class UnassignedVariableAnalyser
     {
-        Procedure _prog;
-
+        readonly Procedure _prog;
 
         public List<(Token, Statement)> UnassignedVars = new();
 
         //When we take a goto or gosub statement, store the statement so we don't take it again (to avoid infinite recursion)
-        readonly List<Statement> JumpsTaken = new();
+        readonly Stack<string> JumpsTaken = new();
       
-        
         public UnassignedVariableAnalyser(Procedure prog)
         {
             _prog = prog;
@@ -23,7 +21,6 @@ namespace BasicPlusParser.Analyser
 
         public (bool, HashSet<Token>) AnalyseCore(IEnumerable<Statement> statements, HashSet<Token> env = null)
         {
-
             bool branchReturns = false;
             // Contains variables that are definitivley assigned in a block
             HashSet<Token> definiteLocalScope = new(new TokenEqualityComparer());
@@ -36,7 +33,6 @@ namespace BasicPlusParser.Analyser
 
             foreach (Statement statement in statements)
             {
-
                 foreach (var err in statement.GetReferencedVars().Where(v => !definiteLocalScope.Contains(v)))
                 {
                     // Don't report the same error twice.
@@ -47,7 +43,6 @@ namespace BasicPlusParser.Analyser
                             UnassignedVars.Add((err, statement));
                         }
                     }
-
                 }
 
                 definiteLocalScope.UnionWith(statement.GetAssignedVars());
@@ -63,12 +58,13 @@ namespace BasicPlusParser.Analyser
                         return (true, definiteOuterScope);
 
                     case GoToStatement s:
-                        if (!JumpsTaken.Any(x=> object.ReferenceEquals(s,x)))
+                        if (!JumpsTaken.Contains(s.Label.Name))
                         {
                             if (_prog.SymbolTable.Labels.ContainsKey(s.Label.Name))
                             {
-                                JumpsTaken.Add(s);
+                                JumpsTaken.Push(s.Label.Name);
                                 (var gotReturns, var gotoVars) = AnalyseCore(_prog.SymbolTable.Labels[s.Label.Name].StatementsFollowingLabel, definiteLocalScope);
+                                JumpsTaken.Pop();
                                 definiteOuterScope.UnionWith(gotoVars);
                                 // Goto always (effectively) returns...
                             }
@@ -110,18 +106,18 @@ namespace BasicPlusParser.Analyser
                         }
                         break;
                     case GosubStatement s:
-                        if (!JumpsTaken.Any(x => object.ReferenceEquals(s, x)))
+                        if (!JumpsTaken.Contains(s.Label.Name))
                         {
                             if (_prog.SymbolTable.Labels.ContainsKey(s.Label.Name)){
                                 var stmtsAfterLabel = _prog.SymbolTable.Labels[s.Label.Name].StatementsFollowingLabel;
-                                JumpsTaken.Add(s);
+                                JumpsTaken.Push(s.Label.Name);
                                 (var gosubReturns, var gosubVars) = AnalyseCore(stmtsAfterLabel, definiteLocalScope);
+                                JumpsTaken.Pop();
                                 definiteLocalScope.UnionWith(gosubVars);
                                 definiteOuterScope.UnionWith(gosubVars);  
                             }
                         }
                         break;
-
                 } 
             }
             return (false, definiteOuterScope);
