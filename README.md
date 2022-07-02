@@ -25,6 +25,7 @@ Features
 * Placing cursor over a symbole will tell you info about the symbol. In the case of an equate, it tells you the value of the equate.
 * Code range folding/unfolding
 * Pressing f12 on a label, equate, matrix or common variable will take you to where it is defined.
+* View all references of a label, equate, matrix, common varialbe and function/subroutine.
 
 
 
