@@ -47,7 +47,6 @@ namespace BasicPlusParser
 
         Procedure ParseProcedureDeclaration()
         {
-            List<string> args = new();
             ProcedureType procedureType;
             ConsumeToken(typeof(CompileToken), optional: true);
 
@@ -99,9 +98,19 @@ namespace BasicPlusParser
                         bool isMatrix =  NextTokenIs(typeof(MatToken));
 
                         if (NextTokenIs(out Token argNameToken,typeof(IdentifierToken))) {
-                            args.Add(argNameToken.Text);
-                            argNameToken.LsClass = "parameter";
-                            _symbolTable.AddParameter(argNameToken, isMatrix);
+
+                            if (_symbolTable.IsParameterDefined(argNameToken))
+                            {
+                                _parseErrors.ReportError(argNameToken, $"Paraneter {argNameToken.Text} has already been defined.");
+                            }
+                            else if (argNameToken is SystemVariableToken)
+                            {
+                                _parseErrors.ReportError(argNameToken, $"A system variable cannot be used as the name of a parameter.");
+                            }
+                            else
+                            {
+                                _symbolTable.AddParameter(argNameToken, isMatrix);
+                            }
                         }
                         else
                         {

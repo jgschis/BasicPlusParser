@@ -23,6 +23,7 @@ namespace BasicPlusLangServer {
 				.WithHandler<HoverHandler>()
 				.WithHandler<DefinitionHandler>()
 				.WithHandler<ReferencesHandler>()
+				//.WithHandler<CompletionHandler>()
 				.WithServices(ConfigureServices)
 				.OnInitialize(Initialize);
 		}
