@@ -188,7 +188,17 @@ namespace BasicPlusParser
             return _symbols.ContainsKey(GetSymbolKey(SymbolKind.CommonLabel, token));
         }
 
-        public  void AddParameter(Token token, bool isMatrix = false)
+        public bool IsParameterDefined(Token token)
+        {
+            if (_symbols.TryGetValue(GetSymbolKey(SymbolKind.Variable, token), out Symbol symbol)){
+                return symbol.Scope == VariableScope.Parameter;
+            } else
+            {
+                return false;
+            }
+        }
+
+        public void AddParameter(Token token, bool isMatrix = false)
         {
             Symbol symbol;
             if (isMatrix)

@@ -992,7 +992,7 @@ namespace BasicPlusParser
             
             if (var is SystemVariableToken)
             {
-                _parseErrors.ReportError(var, $"A system variable cannot be equated.");
+                _parseErrors.ReportError(var, $"A system variable cannot be the name of an equate.");
 
             }
             else if (_symbolTable.ContainsEquateOrVaraible(var))
@@ -1391,7 +1391,7 @@ namespace BasicPlusParser
             List<Matrix> matricies = new();
             do
             {
-                Token matVar = ConsumeIdToken(addIdentifierToSymbolTable:false);
+                Token matVar = ConsumeIdToken(addIdentifierToSymbolTable: false);
                 ConsumeToken(typeof(LParenToken));
                 Expression row = ParseExpr();
                 Expression col = null;
@@ -1399,16 +1399,24 @@ namespace BasicPlusParser
                 {
                     col = ParseExpr();
                 }
-                
+
                 ConsumeToken(typeof(RParenToken));
                 Matrix matrix = new Matrix(matVar, col, row);
                 matricies.Add(matrix);
 
-                if (!_symbolTable.ContainsEquateOrVaraible(matVar)) {
-                    _symbolTable.AddMatrixDeclaration(matVar, col, row);
-                } else
+                if (matVar is SystemVariableToken)
+                {
+                    _parseErrors.ReportError(matVar, $"A system variable cannot be the name of a matrix.");
+
+                }
+                else if (_symbolTable.ContainsEquateOrVaraible(matVar))
                 {
                     _parseErrors.ReportError(matVar, $"The symbol {matVar.Text} has already been defined.");
+
+                }
+                else
+                {
+                    _symbolTable.AddMatrixDeclaration(matVar, col, row);
                 }
 
             } while (NextTokenIs(typeof(CommaToken)));
@@ -1464,7 +1472,12 @@ namespace BasicPlusParser
                 _parseErrors.ReportError(commonBlockId, $"The symbol {commonBlockId.Text} has already been defined.");
             }
 
-            for(int i = 1; i <= nSlashes;i++)
+            if (commonBlockId is SystemVariableToken)
+            {
+                _parseErrors.ReportError(commonBlockId, $"A system variable cannot be used as a common block id.");
+            }
+
+            for (int i = 1; i <= nSlashes;i++)
             {
                 ConsumeToken(typeof(SlashToken));
             }
@@ -1493,8 +1506,12 @@ namespace BasicPlusParser
 
                 if (_symbolTable.ContainsEquateOrVaraible(name)){
                     _parseErrors.ReportError(name,$"The symbol {name.Text} has already been defined.");
-
-                } else
+                }
+                else if (name is SystemVariableToken)
+                {
+                    _parseErrors.ReportError(name, "A system variable cannot be used for the name of a common variable.");
+                }
+                else
                 {
                     if (isMatrix)
                     {
@@ -1506,7 +1523,6 @@ namespace BasicPlusParser
 
                     }
                 }
-
 
                 globalVars.Add(new IdExpression(name));
 
