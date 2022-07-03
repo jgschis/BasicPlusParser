@@ -13,7 +13,7 @@ analyser.Analyse();
 UnassignedVariableAnalyser uva = new UnassignedVariableAnalyser(program);
 uva.Analyse();
 ```
-The parser also contains an implementation of the language server protocol, which means you can use the parser in any IDE that implements the language server protocol, for example Visual Studio Code:
+The parser also contains an implementation of the language server protocol, which means you can use the parser in any IDE that implements the language server protocol client, for example Visual Studio Code:
 ![image](https://user-images.githubusercontent.com/87922814/175839994-065ceeab-476c-4ef5-abf8-ed7ba597f07d.png)
 
 Features
