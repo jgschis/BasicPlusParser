@@ -22,7 +22,7 @@ Features
 * Syntax highlighting.
 * Unreachable code analysis that can  detect when a statement will never run.
 * Smart unassigned variable analysis that takes into account if statements and gosubs. 
-* Placing cursor over a symbol will tell you info about the symbol. In the case of an equate, it tells you the value of the equate.
+* Placing your cursor over a symbol will tell you info about the symbol. In the case of an equate, it tells you the value of the equate.
 * Code range folding/unfolding
 * Pressing f12 on a label, equate, matrix or common variable will take you to where it is defined.
 * View all references of a label, equate, matrix, common varialbe and function/subroutine.
