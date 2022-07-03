@@ -1,4 +1,4 @@
-This is a parser for the Basic + language (of Open Insight). The parser creates a syntax tree from Basic + source code. The parser is also capable of detecting unreachable code and unassigned variables.
+This is an error tolerant parser for the Basic + language (of Open Insight). The parser creates a syntax tree from Basic + source code. The parser is capable of detecting unreachable code and unassigned variables. It also reports  syntax/semantic/usage errors. 
 
 
 ``` csharp
