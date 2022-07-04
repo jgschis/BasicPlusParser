@@ -1,4 +1,4 @@
-This is a parser for the Basic + language (of Open Insight). The parser creates a syntax tree out of a file of Basic + source code. The parser is also capable of detecting unreachable code and unassigned variables.
+This is an error tolerant parser for the Basic + language (of Open Insight). The parser creates a syntax tree from Basic + source code. The parser is capable of detecting unreachable code and unassigned variables. It also reports  syntax/semantic/usage errors. 
 
 
 ``` csharp
@@ -13,7 +13,7 @@ analyser.Analyse();
 UnassignedVariableAnalyser uva = new UnassignedVariableAnalyser(program);
 uva.Analyse();
 ```
-The parser also contains an implementation of the language server protocol, which means you can use the parser in any IDE that implements the language server protocol, for example Visual Studio Code:
+The parser also contains an implementation of the language server protocol, which means you can use the parser in any IDE that implements the language server protocol client, for example Visual Studio Code:
 ![image](https://user-images.githubusercontent.com/87922814/175839994-065ceeab-476c-4ef5-abf8-ed7ba597f07d.png)
 
 Features
@@ -21,11 +21,13 @@ Features
 * Reports errors/warnings with code as you type. 
 * Syntax highlighting.
 * Unreachable code analysis that can  detect when a statement will never run.
-* Unassigned variable analysis that knows that if a variable is only assigned in one branch of an if statemnet, it's not definitively assigned.
-* Placing cursor over a symbol will tell you info about the symbol. In the case of an equate, it tells you the value of the equate.
+* Smart unassigned variable analysis that takes into account if statements and gosubs. If you look at the screenshot above, you can see that d is definitively assigned in the then branch of the if statement but not definitively assigned outside of it.
+* Placing your cursor over a symbol will tell you info about the symbol. In the case of an equate, it tells you the value of the equate.
 * Code range folding/unfolding
 * Pressing f12 on a label, equate, matrix or common variable will take you to where it is defined.
 * View all references of a label, equate, matrix, common varialbe and function/subroutine.
+* Outline, which shows you a list of all internal subroutines, inserts and variables: ![image](https://user-images.githubusercontent.com/87922814/177108415-d787f923-6e11-4c9b-8751-5cc35997ff90.png)
+
 
 
 
