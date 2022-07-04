@@ -3,6 +3,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Server;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
 
 namespace BasicPlusLangServer {
 
@@ -23,19 +24,24 @@ namespace BasicPlusLangServer {
 				.WithHandler<HoverHandler>()
 				.WithHandler<DefinitionHandler>()
 				.WithHandler<ReferencesHandler>()
-				//.WithHandler<CompletionHandler>()
+				.WithHandler<GetOiStoredProcsHandler>()
+				.WithHandler<DocumentSymbolHandler>()
+				//.WithHandler<CompletionHandler>()				
 				.WithServices(ConfigureServices)
 				.OnInitialize(Initialize);
 		}
 
-		void ConfigureServices(IServiceCollection services)
+      
+        void ConfigureServices(IServiceCollection services)
 		{
 			_services = services;
 			_services.AddSingleton<TextDocumentManager>();
 		}
 
 		void ConfigureLogging(ILoggingBuilder logBuilder){
-
+			logBuilder.ClearProviders();
+			logBuilder.AddLanguageProtocolLogging();
+			logBuilder.SetMinimumLevel(LogLevel.Debug);
 		}
 
 		Task Initialize(ILanguageServer server, InitializeParams initializeParams,

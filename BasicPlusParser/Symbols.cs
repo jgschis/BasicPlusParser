@@ -10,13 +10,13 @@ namespace BasicPlusParser
         public List<Token> LabelReferences = new();
         public List<Token> ProcedureParameters = new();
 
-        Dictionary<string, Symbol> _symbols = new();
+        public Dictionary<string, Symbol> _Symbols = new();
         public Dictionary<string, SymbolReference> SymbolIndex = new();
 
         bool AddSymbol(Symbol symbol)
         {
             UpdateIndex(symbol.Token,symbol);
-            return _symbols.TryAdd(GetSymbolKey(symbol.Kind,symbol.Token), symbol);
+            return _Symbols.TryAdd(GetSymbolKey(symbol.Kind,symbol.Token), symbol);
         }
 
         string GetSymbolKey(SymbolKind kind, Token token)
@@ -62,7 +62,7 @@ namespace BasicPlusParser
 
         public void AddLabelDeclaration(Token token)
         {
-            if (!_symbols.TryGetValue(GetSymbolKey(SymbolKind.Label, token), out Symbol symbol))
+            if (!_Symbols.TryGetValue(GetSymbolKey(SymbolKind.Label, token), out Symbol symbol))
             {
                 symbol = new Symbol(token, SymbolKind.Label);
                 symbol.LabelDeclared = true;
@@ -97,7 +97,7 @@ namespace BasicPlusParser
 
         public void AddSubroutineReference(Token token)
         {
-            if (_symbols.TryGetValue(GetSymbolKey(SymbolKind.Subroutine, token), out Symbol symbol))
+            if (_Symbols.TryGetValue(GetSymbolKey(SymbolKind.Subroutine, token), out Symbol symbol))
             {
                 UpdateIndex(token, symbol);
             }
@@ -105,7 +105,7 @@ namespace BasicPlusParser
 
         public void AddFunctionReference(Token token)
         {
-            if (_symbols.TryGetValue(GetSymbolKey(SymbolKind.Function,token),out Symbol symbol))
+            if (_Symbols.TryGetValue(GetSymbolKey(SymbolKind.Function,token),out Symbol symbol))
             {
                 UpdateIndex(token, symbol);
             }
@@ -113,7 +113,7 @@ namespace BasicPlusParser
 
         public void AddLabelReference(Token token)
         {
-            if (!_symbols.TryGetValue(GetSymbolKey(SymbolKind.Label, token), out Symbol symbol))
+            if (!_Symbols.TryGetValue(GetSymbolKey(SymbolKind.Label, token), out Symbol symbol))
             {
                 symbol = new Symbol(token, SymbolKind.Label);
                 AddSymbol(symbol);
@@ -127,7 +127,7 @@ namespace BasicPlusParser
 
         public bool IsMatrix(Token token)
         {
-            if (_symbols.TryGetValue(GetSymbolKey(SymbolKind.Variable, token),out Symbol symbol)) {
+            if (_Symbols.TryGetValue(GetSymbolKey(SymbolKind.Variable, token),out Symbol symbol)) {
                 return symbol.Type == VariableType.Matrix;
 
             } else
@@ -138,17 +138,17 @@ namespace BasicPlusParser
 
         public bool IsFunctionDeclared(Token token)
         {
-            return _symbols.ContainsKey(GetSymbolKey(SymbolKind.Function, token));
+            return _Symbols.ContainsKey(GetSymbolKey(SymbolKind.Function, token));
         }
 
         public bool IsSubroutineDeclared(Token token)
         {
-            return _symbols.ContainsKey(GetSymbolKey(SymbolKind.Subroutine, token));
+            return _Symbols.ContainsKey(GetSymbolKey(SymbolKind.Subroutine, token));
         }
 
         public bool IsLabelDeclared(Token token)
         {
-            if (_symbols.TryGetValue(GetSymbolKey(SymbolKind.Label,token),out Symbol symbol))
+            if (_Symbols.TryGetValue(GetSymbolKey(SymbolKind.Label,token),out Symbol symbol))
             {
                 return symbol.LabelDeclared;
             }
@@ -157,16 +157,16 @@ namespace BasicPlusParser
 
         public bool ContainsEquateOrVaraible(Token token)
         {
-            return  _symbols.ContainsKey(GetSymbolKey(SymbolKind.Equate, token)) ||
-                    _symbols.ContainsKey(GetSymbolKey(SymbolKind.Variable, token));
+            return _Symbols.ContainsKey(GetSymbolKey(SymbolKind.Equate, token)) ||
+                    _Symbols.ContainsKey(GetSymbolKey(SymbolKind.Variable, token));
         }
 
         public void AddVariableReference(Token token, VariableScope scope = VariableScope.Local)
         {
             Symbol symbol;
             bool found =
-                _symbols.TryGetValue(GetSymbolKey(SymbolKind.Equate, token), out symbol) ||
-                _symbols.TryGetValue(GetSymbolKey(SymbolKind.Variable, token), out symbol);
+                _Symbols.TryGetValue(GetSymbolKey(SymbolKind.Equate, token), out symbol) ||
+                _Symbols.TryGetValue(GetSymbolKey(SymbolKind.Variable, token), out symbol);
 
 
             if (found)
@@ -185,12 +185,12 @@ namespace BasicPlusParser
 
         public bool IsCommonBlockNameDefined(Token token)
         {
-            return _symbols.ContainsKey(GetSymbolKey(SymbolKind.CommonLabel, token));
+            return _Symbols.ContainsKey(GetSymbolKey(SymbolKind.CommonLabel, token));
         }
 
         public bool IsParameterDefined(Token token)
         {
-            if (_symbols.TryGetValue(GetSymbolKey(SymbolKind.Variable, token), out Symbol symbol)){
+            if (_Symbols.TryGetValue(GetSymbolKey(SymbolKind.Variable, token), out Symbol symbol)){
                 return symbol.Scope == VariableScope.Parameter;
             } else
             {

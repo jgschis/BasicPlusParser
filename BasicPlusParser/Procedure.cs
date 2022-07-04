@@ -52,6 +52,34 @@ namespace BasicPlusParser
             // Return closest match
             SymbolTable.SymbolIndex.TryGetValue($"{Tokens[index].LineNo}.{Tokens[index].StartCol}", out symbolRef);
             return symbolRef?.Symbol;
-        }       
+        }
+
+        public Token GetToken(int lineNo, int col)
+        {
+            int min = 0;
+            int max = Tokens.Count;
+            int index = 0;
+            while (min <= max)
+            {
+                index = ((max - min) / 2) + min;
+
+                Token token = Tokens[index];
+                if (token.LineNo == lineNo && token.StartCol <= col && token.EndCol >= col)
+                {
+                    // Return exact match
+                    return token;
+                }
+                else if (token.LineNo < lineNo || (token.LineNo == lineNo && token.StartCol < col))
+                {
+                    min = index + 1;
+                }
+                else
+                {
+                    max = index - 1;
+                }
+            }
+            // Return closest match
+            return Tokens[index];
+        }
     }
 }
