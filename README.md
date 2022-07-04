@@ -26,6 +26,8 @@ Features
 * Code range folding/unfolding
 * Pressing f12 on a label, equate, matrix or common variable will take you to where it is defined.
 * View all references of a label, equate, matrix, common varialbe and function/subroutine.
+* Outline, which shows you a list of all internal subroutines, inserts and variables: ![image](https://user-images.githubusercontent.com/87922814/177108415-d787f923-6e11-4c9b-8751-5cc35997ff90.png)
+
 
 
 
