@@ -328,6 +328,8 @@ namespace BasicPlusParser
                 case "@recur2":
                 case "@recur3":
                 case "@recur4":
+                case "@lower.case":
+                case "@upper.case":
                     return new SystemVariableToken { Text = atOperatorOrSystemVariable };
                 default:
                     // We're not dealing with a system variabe, so let's return the at operator and put the token position to after the at operator.
