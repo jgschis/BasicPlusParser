@@ -577,6 +577,7 @@ namespace BasicPlusParser
             List<Statement> thenBlock = new();
             bool hasThen = false;
             bool hasElse = false;
+            bool isSingleLineThemElseStmt = false;
 
             if (NextTokenIs(out Token thenToken, typeof(ThenToken)))
             {
@@ -590,7 +591,9 @@ namespace BasicPlusParser
                 }
                 else
                 {
-                    thenBlock = ParseStmts(_ => PeekNextToken() is ElseToken || PeekNextToken() is NewLineToken || IsAtEnd());
+                    isSingleLineThemElseStmt = true;
+                    thenBlock = ParseStmts(_ => PeekNextToken() is ElseToken || PeekNextToken() is NewLineToken || IsAtEnd() ||
+                        (PeekNextToken() is SemiColonToken && PeekNextToken(1) is NewLineToken));
                     if (thenBlock.All(s => s is EmptyStatement) || thenBlock.Count == 0)
                     {
                         _parseErrors.ReportError(_nextToken, "Then block requires at least 1 statement.");
@@ -601,7 +604,7 @@ namespace BasicPlusParser
             if (NextTokenIs(out Token elseToken, typeof(ElseToken)))
             {
                 hasElse = true;
-                if (NextTokenIs(typeof(NewLineToken)))
+                if (!isSingleLineThemElseStmt && NextTokenIs(typeof(NewLineToken)))
                 {
                     elseBlock = ParseStmts(() => PeekNextToken() is EndToken);
                     Token endToken = ConsumeToken(typeof(EndToken));
@@ -609,7 +612,9 @@ namespace BasicPlusParser
                 }
                 else 
                 {     
-                    elseBlock = ParseStmts(() => PeekNextToken() is NewLineToken || IsAtEnd());
+                    elseBlock = ParseStmts(() => PeekNextToken() is NewLineToken || IsAtEnd() ||
+                      (PeekNextToken() is SemiColonToken && PeekNextToken(1) is NewLineToken));
+
                     if (elseBlock.All(s => s is EmptyStatement) || elseBlock.Count == 0)
                     {
                         _parseErrors.ReportError(_nextToken, "Else block block requires at least 1 statement.");
