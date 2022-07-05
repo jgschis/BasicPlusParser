@@ -15,63 +15,61 @@ namespace BasicPlusParser
         public virtual HashSet<Token> GetAssignedVars()
         {
             HashSet<Token> assignedVars = new(new TokenEqualityComparer());
-            FieldInfo[] fields = this.GetType().GetFields();
-            foreach (var field in fields)
+
+            if (this is IdExpression es && es.IdentifierType == IdentifierType.Assignment)
             {
-                object temp = field.GetValue(this);
-                switch (temp)
+                assignedVars.Add(es.Token);
+            }
+            else
+            {
+                FieldInfo[] fields = this.GetType().GetFields();
+                foreach (var field in fields)
                 {
-
-                    case IdExpression es when es.IdentifierType == IdentifierType.Assignment:
-                        assignedVars.Add(es.Token);
-                        break;
-
-                    case Statement s:
-                        assignedVars.UnionWith(s.GetAssignedVars());
-                        break;
-                    case List<Expression> ls:
-                        foreach (var v in ls)
-                        {
-                            if (v is IdExpression es && es.IdentifierType == IdentifierType.Assignment)
-                            {
-                                assignedVars.Add(es.Token);
-                            } else
+                    object temp = field.GetValue(this);
+                    switch (temp)
+                    {
+                        case Statement s:
+                            assignedVars.UnionWith(s.GetAssignedVars());
+                            break;
+                        case List<Expression> ls:
+                            foreach (var v in ls)
                             {
                                 assignedVars.UnionWith(v.GetAssignedVars());
                             }
-                        }
-                        break;
+                            break;
+                    }
                 }
             }
+
             return assignedVars;
         }
     
 
         public virtual HashSet<Token> GetReferencedVars()
         {
-            
-
             HashSet<Token> referencedVars = new(new TokenEqualityComparer());
-            FieldInfo[] fields = this.GetType().GetFields();
-            foreach (var field in fields)
+
+            if (this is IdExpression es && es.IdentifierType == IdentifierType.Reference)
             {
-
-                switch (field.GetValue(this))
+                referencedVars.Add(es.Token);
+            }
+            else
+            {
+                FieldInfo[] fields = this.GetType().GetFields();
+                foreach (var field in fields)
                 {
-
-                    case IdExpression es when es.IdentifierType == IdentifierType.Reference:
-                        referencedVars.Add(es.Token);
-                        break;
-    
-                    case Statement e:
-                        referencedVars.UnionWith(e.GetReferencedVars());
-                        break;
-                    case List<Expression> ls:
-                        foreach (var v in ls)
-                        {
-                            referencedVars.UnionWith(v.GetAssignedVars());
-                        }
-                        break;
+                    switch (field.GetValue(this))
+                    {
+                        case Statement e:
+                            referencedVars.UnionWith(e.GetReferencedVars());
+                            break;
+                        case List<Expression> ls:
+                            foreach (var v in ls)
+                            {
+                                referencedVars.UnionWith(v.GetReferencedVars());
+                            }
+                            break;
+                    }
                 }
             }
             return referencedVars;
