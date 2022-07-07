@@ -150,7 +150,7 @@ namespace BasicPlusParser
                     statements.Add(statement);
                     AnnotateStmt(statements, lineNo, lineCol);
                     if (stop(statements)) break;
-                    ConsumeStatementSeparator();
+                    ConsumeStatementSeparator(statement);
                 }
                 catch (ParseException e)
                 {
@@ -436,7 +436,7 @@ namespace BasicPlusParser
             throw Error(token, $"{token.Text} is not a valid statement.");
         }
 
-        void ConsumeStatementSeparator()
+        void ConsumeStatementSeparator(Statement statement)
         {
             if (PeekNextToken() is EofToken)
             {
@@ -453,6 +453,9 @@ namespace BasicPlusParser
                 ConsumeToken(typeof(NewLineToken), optional:true);
                 return;
             }
+
+            // The internal sub statement doesn't need a separator...
+            if (statement is InternalSubStatement) return;
 
             throw Error(_prevToken, "Semicolon or newline expected after statement.");
         }
@@ -1140,8 +1143,8 @@ namespace BasicPlusParser
             return new ReadNextStatement
             {
                 Cursor = cursor,
-                Value = new IdExpression(value),
-                Variable = new IdExpression(variable),
+                Value = value != null ? new IdExpression(value) : null,
+                Variable = variable != null ? new IdExpression(variable) : null,
                 Else = elseBlock,
                 Then = thenBlock
             };
@@ -2396,7 +2399,6 @@ namespace BasicPlusParser
             return _tokens[_nextTokenIndex++];
         }
 
-
         bool NextTokenIs(params Type[] validTokens)
         {
             return NextTokenIs(out Token token, validTokens);
@@ -2442,25 +2444,19 @@ namespace BasicPlusParser
             }
         }
 
-        /*ParseException Error(int lineNo, string message)
-        {
-            _parseErrors.ReportError(lineNo, message);
-            return new ParseException();
-        }*/
         ParseException Error(Token token, string message)
         {
-            //_parseErrors.ReportError(token, message);
             return new ParseException(token, message);
         }
 
         public void CheckIfJumpLabelsAreDefined()
         {
             string errMsg = "The label {0} has not been defined.";
-            foreach(var token in _symbolTable.LabelReferences)
+            foreach(var label in _symbolTable.LabelReferences)
             {
-               if (!_symbolTable.IsLabelDeclared(token))
+               if (!_symbolTable.IsLabelDeclared(label))
                 {
-                    _parseErrors.ReportError(token, String.Format(errMsg, token.Text));
+                    _parseErrors.ReportError(label, String.Format(errMsg, label.Text));
                 }
                 
             }
