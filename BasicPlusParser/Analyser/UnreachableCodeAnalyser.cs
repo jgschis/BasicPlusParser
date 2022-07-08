@@ -10,6 +10,8 @@ namespace BasicPlusParser.Analyser
         readonly Procedure _prog;
         public readonly List<Statement> UnreachableStatements = new();
         public readonly List<Statement> UnreachableLabels = new();
+        // We want to warn about labels that are reached through fall through, as thsi is 99.99% of the time unintentional.
+        public readonly List<Statement> LabelsReachedViaFallThRough = new();
         string _currLabel = START;
         readonly Dictionary<string, List<string>> _reachabilityGraph = new();
         readonly HashSet<string> _reachableLabels = new();
@@ -40,7 +42,11 @@ namespace BasicPlusParser.Analyser
                         blockReturns = true;
                         break;
                     case InternalSubStatement s:
-                        if (!blockReturns) UpdateReachabilityGraph(s.Label.Name);
+                        if (!blockReturns)
+                        {
+                            LabelsReachedViaFallThRough.Add(statement);
+                            UpdateReachabilityGraph(s.Label.Name);
+                        }
                         _currLabel = s.Label.Name;
                         blockReturns = false;
                         break;

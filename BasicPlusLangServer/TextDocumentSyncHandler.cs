@@ -137,6 +137,19 @@ namespace BasicPlusLangServer
                 diagnoistics.Add(diagnostic);
             }
 
+            foreach (var label in uca.LabelsReachedViaFallThRough)
+            {
+                Diagnostic diagnostic = new()
+                {
+                    Severity = DiagnosticSeverity.Warning,
+                    Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(label.LineNo - 1, label.LineCol, label.LineNo - 1, label.EndCol),
+                    Message = "Label reached via fallthrough. Is this intentional?",
+                    Source = "ex",
+                    Code = "a"
+                };
+                diagnoistics.Add(diagnostic);
+            }
+
 
             _facade.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams
             {
