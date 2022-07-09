@@ -10,5 +10,7 @@ namespace BasicPlusParser
         public List<Token> Tokens;
         // This contains all the comment tokens. This is used for syntax highlighting.
         public List<Token> CommentTokens;
+
+        public ParseErrors TokenErrors = new();
     }
 }
