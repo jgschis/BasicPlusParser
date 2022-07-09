@@ -11,14 +11,14 @@ namespace BasicPlusParser
         int _pos = 0;
         int _col = 0;
         int _lineNo = 1;
+
         List<Token> _tokens = new();
         List<Token> _commentTokens = new();
         Token _prevToken => _tokens.Count > 0 ? _tokens.Last() : null;
-        readonly ParseErrors _tokenErrors;
+        readonly ParseErrors _tokenErrors = new();
 
-        public Tokenizer(string text, ParseErrors error = null)
+        public Tokenizer(string text)
         {
-            _tokenErrors = error ?? new ParseErrors();
             _source = text;
         }
 
@@ -65,13 +65,14 @@ namespace BasicPlusParser
                     }
                 }
             }
-       
+
             _tokens.Add(new EofToken { LineNo = _lineNo, Pos = _source.Length, StartCol = _col, EndCol = _col, EndLineNo = _lineNo });
-            
+
             return new TokenizerOutput
             {
                 Tokens = _tokens,
-                CommentTokens = _commentTokens
+                CommentTokens = _commentTokens,
+                TokenErrors = _tokenErrors
             };
         }
 
@@ -81,65 +82,64 @@ namespace BasicPlusParser
             switch (character)
             {
                 case '=':
-                    return new EqualToken { Text = character.ToString() };
+                    return new EqualToken { Text = _source[start.._pos] };
                 case '"':
-                    return ScanStringLiteral('"');
                 case '\'':
-                    return ScanStringLiteral('\'');
+                    return ScanStringLiteral(_source[start]);
                 case '<':
-                    if (Match("=")) return new LteToken { Text = "<=" };
-                    else return new LAngleBracketToken { Text = character.ToString() };
+                    if (Match("=")) return new LteToken { Text = _source[start.._pos] };
+                    else return new LAngleBracketToken { Text = _source[start.._pos] };
                 case '#':
-                    if (Match("pragma")) return new PragmaToken { Text = "#pragma" };
-                    else return new HashTagToken { Text = character.ToString() };
+                    if (Match("pragma")) return new PragmaToken { Text = _source[start.._pos] };
+                    else return new HashTagToken { Text = _source[start.._pos] };
                 case '+':
-                    if (Match("++")) return new MultiValueAddToken { Text = "+++" };
-                    else if (Match('=')) return new PlusEqualToken { Text = "+=" };
-                    else return new PlusToken { Text = character.ToString() };
+                    if (Match("++")) return new MultiValueAddToken { Text = _source[start.._pos] };
+                    else if (Match('=')) return new PlusEqualToken { Text = _source[start.._pos] };
+                    else return new PlusToken { Text = _source[start.._pos] };
                 case '-':
-                    if (Match("--")) return new MultiValueSubToken { Text = "---" };
-                    else if (Match("=")) return new MinusEqualToken { Text = "-=" };
-                    else return new MinusToken { Text = character.ToString() };
+                    if (Match("--")) return new MultiValueSubToken { Text = _source[start.._pos] };
+                    else if (Match("=")) return new MinusEqualToken { Text = _source[start.._pos] };
+                    else return new MinusToken { Text = _source[start.._pos] };
                 case '/':
                     if (StartOfStmt() && Match("/")) return ScanSingleLineComment();
-                    else if (Match("//")) return new MultiValueDivToken { Text = "///" };
-                    else if (Match("=")) return new SlashEqualToken { Text = "/=" };
+                    else if (Match("//")) return new MultiValueDivToken { Text = _source[start.._pos] };
+                    else if (Match("=")) return new SlashEqualToken { Text = _source[start.._pos] };
                     else if (Match("*")) return ScanMultiLineComment();
-                    else return new SlashToken { Text = character.ToString() };
+                    else return new SlashToken { Text = _source[start.._pos] };
                 case '*':
                     if (StartOfStmt()) return ScanSingleLineComment();
-                    else if (Match("=")) return new StarEqualToken { Text = "*=" };
-                    else if (Match("**")) return new MultiValueMullToken { Text = "***" };
-                    else if (Match("*")) return new PowerToken { Text = "**" };
-                    else return new StarToken { Text = character.ToString() };
+                    else if (Match("=")) return new StarEqualToken { Text = _source[start.._pos] };
+                    else if (Match("**")) return new MultiValueMullToken { Text = _source[start.._pos] };
+                    else if (Match("*")) return new PowerToken { Text = _source[start.._pos] };
+                    else return new StarToken { Text = _source[start.._pos] };
                 case '!':
-                    if (Match("=")) return new ExcalmEqToken { Text = "!=" };
+                    if (Match("=")) return new ExcalmEqToken { Text = _source[start.._pos] };
                     else if (StartOfStmt()) return ScanSingleLineComment();
-                    else return new ExclamToken { Text = character.ToString() };
+                    else return new ExclamToken { Text = _source[start.._pos] };
                 case ':':
-                    if (Match("::")) return new MultiValueConcatToken { Text = ":::" };
-                    else if (Match("=")) return new ColonEqualToken { Text = ":=" };
-                    else return new ColonToken { Text = character.ToString() };
+                    if (Match("::")) return new MultiValueConcatToken { Text = _source[start.._pos] };
+                    else if (Match("=")) return new ColonEqualToken { Text = _source[start.._pos] };
+                    else return new ColonToken { Text = _source[start.._pos] };
                 case '>':
-                    return new RAngleBracketToken { Text = character.ToString() };
+                    return new RAngleBracketToken { Text = _source[start.._pos] };
                 case ',':
-                    return new CommaToken { Text = character.ToString() };
+                    return new CommaToken { Text = _source[start.._pos] };
                 case ']':
-                    return new RSqrBracketToken { Text = character.ToString() };
+                    return new RSqrBracketToken { Text = _source[start.._pos] };
                 case '[':
-                    return new LSqrBracketToken { Text = character.ToString() };
+                    return new LSqrBracketToken { Text = _source[start.._pos] };
                 case ')':
-                    return new RParenToken { Text = character.ToString() };
+                    return new RParenToken { Text = _source[start.._pos] };
                 case '(':
-                    return new LParenToken { Text = character.ToString() };
+                    return new LParenToken { Text = _source[start.._pos] };
                 case ';':
-                    return new SemiColonToken { Text = character.ToString() };
+                    return new SemiColonToken { Text = _source[start.._pos] };
                 case '{':
-                    return new LCurlyToken { Text = character.ToString() };
+                    return new LCurlyToken { Text = _source[start.._pos] };
                 case '}':
-                    return new RCurlyToken { Text = character.ToString() };
+                    return new RCurlyToken { Text = _source[start.._pos] };
                 case '$' when Match("insert"):
-                    return new InsertToken { Text = "$insert" };
+                    return new InsertToken { Text = _source[start.._pos] };
                 case '\\':
                     return ScanNumber();
                 case '.':
@@ -156,7 +156,9 @@ namespace BasicPlusParser
                     return new NewLineToken { Text = _source[start.._pos] };
                 case ' ':
                 case '\t':
-                    while (Match(' ') || Match('\t')) ;
+                case '\f':
+                case '\v':
+                    while (Match(' ') || Match('\t') || Match('\f') || Match('\v'));
                     return new WhiteSpaceToken { Text = _source[start.._pos] };
                 default:
                     if (IsIdentifierOrKeyWord(character))
@@ -184,7 +186,8 @@ namespace BasicPlusParser
         bool IsNumber(char chr, bool hexAllowed = false)
         {
             return chr >= '0' && chr <= '9' ||
-                (hexAllowed && (chr >= 'a' && chr <= 'f') || (chr >= 'A' && chr <= 'F'));
+                (hexAllowed && (chr >= 'a' && chr <= 'f') || (chr >= 'A' && chr <= 'F'))
+                || chr == '.';
         }
 
         bool StartOfStmt()
@@ -195,9 +198,9 @@ namespace BasicPlusParser
         CommentToken ScanSingleLineComment()
         {
             int start = _pos -1;
-            while (Peek() != '\r' && !IsAtEnd())
+            while (!IsAtEnd() && Peek() != '\r')
             {
-                char chr = Advance();
+                Advance();
             }
             return new CommentToken { Text = _source[start.._pos] };
         }
@@ -214,34 +217,34 @@ namespace BasicPlusParser
                 }
             }
 
-            _tokenErrors.ReportError(_lineNo, "Multiline comment must be delimited with */",_col,_col);
-            return null;
+            return new CommentToken { Text = _source[start.._pos] };
         }
-
+        
         StringToken ScanStringLiteral(char delim)
         {
             int start = _pos - 1;
             List<char> chars = new();
             while (Peek() != delim && !IsAtEnd())
             {
-                char chr = Advance();
+                char chr = Peek();
 
                 if (chr == '\r')
                 {
-                    if (chars.Count > 1 && chars.Last() == '|')
+                    if (chars.Count > 0 && chars.Last() == '|')
                     {
                         chars.RemoveAt(chars.Count - 1);
+                        Advance();
                         Advance();
                         IncrementLineNo();
                         continue;
                     }
                     else
                     {
-                        _tokenErrors.ReportError(_lineNo, $"String must be enclosed by {delim}.",_col,_col);
                         break;
                     }
                 }
-                chars.Add(chr);
+               
+                chars.Add(Advance());
             }
 
             if (!Match(delim))
@@ -250,15 +253,15 @@ namespace BasicPlusParser
             }
 
 
-            string str = new String(chars.ToArray());
+            string str = new(chars.ToArray());
             return new StringToken { Str = str, Delim = delim , Text = _source[start.._pos]};
         }
-
 
         Token ScanSystemVariableOrAtOperator()
         {
             int origPos = _pos;
             int origCol = _col;
+            int origLineNo = _lineNo;
 
             int start = _pos - 1;
             while (IsIdentifierOrKeyWord(Peek()) || IsNumber(Peek()) || Peek() == '_' || Peek() == '@' || Peek() == '.' || Peek() == '$')
@@ -336,6 +339,7 @@ namespace BasicPlusParser
                     // We're not dealing with a system variabe, so let's return the at operator and put the token position to after the at operator.
                     _pos = origPos;
                     _col = origCol;
+                    _lineNo = origLineNo;
                     return new AtOperatorToken { Text = atOperatorOrSystemVariable };
            }
         }
@@ -458,45 +462,46 @@ namespace BasicPlusParser
 
         NumberToken ScanNumber()
         {
-            int start = _pos - 1;
-            bool hexAllowed = (_source[start] == '0' && Match("x") || _source[start] == '\\');
-            bool dotAllowed = _source[start] != '.';
+            int startPos = _pos - 1;
+            int startCol = _col - 1;
+
+            bool isHexLiteral = (_source[startPos] == '0' && Match("x") || _source[startPos] == '\\');
 
             while (!IsAtEnd())
             {
                 char chr = Peek();
-                if (chr == '.')
+               
+                if (!IsNumber(chr,hexAllowed: isHexLiteral))
                 {
-                    if (dotAllowed)
-                    {
-                        dotAllowed = false;
-                    } else
-                    {
-                        _tokenErrors.ReportError(_lineNo, "Number contains more than 1 decimal point.",_col,_col);
-                        return null;
-                    }
-                } else
-                {
-                    if (!IsNumber(chr,hexAllowed:hexAllowed))
-                    {
-                        break;
-                    }
+                    break;
                 }
+                
                 Advance();
             }
 
-            if (_source[start] == '\\' && !Match('\\'))
+            if (isHexLiteral) Match('\\');
+           
+            string number = _source[startPos.._pos];
+
+            if (isHexLiteral)
             {
-                _tokenErrors.ReportError(_lineNo, "Number must end in \\",_col,_col);
-                return null;
+                if (number.Contains('.'))
+                {
+                    _tokenErrors.ReportError(_lineNo, "Hex literal cannot contain a decimal point.", startCol, _col);
+                }
+                else if (number.StartsWith('\\') && (number.Last() != '\\' || number.Length == 1))
+                {
+                    _tokenErrors.ReportError(_lineNo, "Hex literal must be terminated by \\.", startCol, _col);
+                }
+                else if ((number.StartsWith("0x",StringComparison.OrdinalIgnoreCase)  || number.StartsWith('\\') )&& number.Length < 3)
+                {
+                    _tokenErrors.ReportError(_lineNo, "Invalid hex literal.", startCol, _col);
+                }
+                
             }
-
-            string number = _source[start.._pos];
-
-            if (number.Last() == '.')
+            else if ((number.Last() == '.' || number.Count(x => x == '.') > 1))
             {
-                _tokenErrors.ReportError(_lineNo, "Invalid decimal point.",_col,_col);
-                return null;
+                _tokenErrors.ReportError(_lineNo, "The number contains an invalid deciaml point.", startCol, _col);
             }
 
             return new NumberToken { Text = number };
