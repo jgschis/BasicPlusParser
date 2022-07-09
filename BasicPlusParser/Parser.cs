@@ -9,30 +9,36 @@ namespace BasicPlusParser
 {
     public class Parser
     {
+        readonly string _text;
+
         int _nextTokenIndex = 0;
-        readonly List<Token> _tokens;
-        readonly List<Token> _commentTokens;
+        List<Token> _tokens;
+        List<Token> _commentTokens;
         Token _nextToken => _nextTokenIndex < _tokens.Count ? _tokens[_nextTokenIndex] : _tokens.Last();
         Token _prevToken => _nextTokenIndex > 0 ? _tokens[_nextTokenIndex - 1] : null;
 
-        readonly ParseErrors _parseErrors = new();
-        readonly List<Region> _regions = new();
-        readonly Symbols _symbolTable = new();
+        ParseErrors _parseErrors = new();
+        List<Region> _regions = new();
+        Symbols _symbolTable = new();
 
         public Parser(string text)
         {
-            Tokenizer tokenizer = new(text, _parseErrors);
-            var tokenizerOutput = tokenizer.Tokenise();
-            _tokens = tokenizerOutput.Tokens;
-            _commentTokens = tokenizerOutput.CommentTokens;
+            _text = text;
         }
 
         public Procedure Parse()
         {
-            if (_tokens.Count == 1)
+            if (_text == "")
             {
+                // If there is no source code, return an "empty" procedure.
                 return new Procedure();
             }
+
+            Tokenizer tokenizer = new(_text);
+            TokenizerOutput tokenizerOutput = tokenizer.Tokenise();
+            _tokens = tokenizerOutput.Tokens;
+            _commentTokens = tokenizerOutput.CommentTokens;
+            _parseErrors.Errors.AddRange(tokenizerOutput.TokenErrors.Errors);
 
             Procedure procedure = ParseProcedureDeclaration();
             procedure.Statements = ParseStmts(() => IsAtEnd());
@@ -163,24 +169,22 @@ namespace BasicPlusParser
 
         public Statement ParseStmt(bool inLoop = false)
         {
-            if (PeekNextToken() is SemiColonToken)
-            {
-                return new EmptyStatement();
-            }
-
             Token token = GetNextToken();
             if (token is IdentifierToken)
             {
-                if (!IsMatrix(token) && NextTokenIs(typeof(EqualToken)))
+                if (IsMatrix(token))
+                {
+                    return ParseMatrixAssignmentStmt(token);
+                }
+                else if (NextTokenIs(typeof(EqualToken)))
                 {
                     return ParseAssignmentStmt(token);
-
                 }
-                else if (!IsMatrix(token) && NextTokenIs(typeof(LAngleBracketToken)))
+                else if (NextTokenIs(typeof(LAngleBracketToken)))
                 {
                     return ParseAngleAssignmentStmt(token);
                 }
-                else if (!IsMatrix(token) && token.DisallowFunction == false && NextTokenIs(typeof(LSqrBracketToken)))
+                else if (!token.DisallowFunction && NextTokenIs(typeof(LSqrBracketToken)))
                 {
                     return ParseSquareBracketArrayAssignmentStmt(token);
                 }
@@ -188,19 +192,19 @@ namespace BasicPlusParser
                 {
                     return ParseInternalSubStmt(token);
                 }
-                else if (!IsMatrix(token) && NextTokenIs(typeof(PlusEqualToken)))
+                else if (NextTokenIs(typeof(PlusEqualToken)))
                 {
                     return ParsePlusAssignmentStmt(token);
                 }
-                else if (!IsMatrix(token) && NextTokenIs(typeof(MinusEqualToken)))
+                else if (NextTokenIs(typeof(MinusEqualToken)))
                 {
                     return ParseMinusAssignmentStmt(token);
                 }
-                else if (!IsMatrix(token) && NextTokenIs(typeof(SlashEqualToken)))
+                else if (NextTokenIs(typeof(SlashEqualToken)))
                 {
                     return ParseDivideAssignmentStmt(token);
                 }
-                else if (!IsMatrix(token) && NextTokenIs(typeof(StarEqualToken)))
+                else if (NextTokenIs(typeof(StarEqualToken)))
                 {
                     return ParseMulAssignmentStmt(token);
                 }
@@ -208,14 +212,10 @@ namespace BasicPlusParser
                 {
                     return ParseConcatAssignmentStmt(token);
                 }
-                else if (!token.DisallowFunction && !IsMatrix(token) && NextTokenIs(typeof(LParenToken)))
+                else if (!token.DisallowFunction && NextTokenIs(typeof(LParenToken)))
                 {
                     return ParseFunctionCallStmt(token);
                 }
-                else if (IsMatrix(token))
-                {
-                    return ParseMatrixAssignmentStmt(token);
-                }  
                 else if (token is BeginToken)
                 {
                     return ParseCaseStmt(token);
@@ -425,14 +425,23 @@ namespace BasicPlusParser
             {
                 return ParseIfStmt();
             }
-            else if (inLoop == true && token is WhileToken)
+            else if (token is WhileToken)
             {
-                return ParseWhileStmt();
+                return ParseWhileStmt(token,inLoop);
             }
-            else if (inLoop == true && token is UntilToken)
+            else if (token is UntilToken)
             {
-                return ParseUntilStmt();
+                return ParseUntilStmt(token,inLoop);
             }
+            else if (token is SemiColonToken)
+            {
+                return new EmptyStatement();
+            }
+            else if (token is NewLineToken)
+            {
+                return new EmptyStatement();
+            }
+           
             throw Error(token, $"{token.Text} is not a valid statement.");
         }
 
@@ -454,8 +463,8 @@ namespace BasicPlusParser
                 return;
             }
 
-            // The internal sub statement doesn't need a separator...
-            if (statement is InternalSubStatement) return;
+            // The internal sub and empty statements doesn't need a separator...
+            if (statement is InternalSubStatement || statement is EmptyStatement) return;
 
             throw Error(_prevToken, "Semicolon or newline expected after statement.");
         }
@@ -781,9 +790,6 @@ namespace BasicPlusParser
 
             (List<Statement> thenBlock, List<Statement> elseBlock) = ParseThenElseBlock();
 
-            //int a
-            
-
             return new OpenStatement
             {
                 Else = elseBlock,
@@ -802,7 +808,6 @@ namespace BasicPlusParser
         {
             return new NullStatement();
         }
-
 
         Statement ParseGoToStmt()
         {
@@ -977,20 +982,32 @@ namespace BasicPlusParser
             };
         }
 
-        Statement ParseWhileStmt()
+        Statement ParseWhileStmt(Token token, bool inLoop)
         {
             Expression cond = ParseExpr();
             ConsumeToken(typeof(DoToken),optional:true);
+
+            if (!inLoop)
+            {
+                _parseErrors.ReportError(token, "The while statment can only be used in loop.");
+            }
+
             return new WhileStatement
             {
                 Condition = cond
             };
         }
 
-        Statement ParseUntilStmt()
+        Statement ParseUntilStmt(Token token, bool inLoop)
         {
             Expression cond = ParseExpr();
             ConsumeToken(typeof(DoToken),optional:true);
+
+            if (!inLoop)
+            {
+                _parseErrors.ReportError(token, "The until statment can only be used in loop.");
+            }
+
             return new UntilStatement
             {
                 Condition = cond
@@ -1000,9 +1017,6 @@ namespace BasicPlusParser
         Statement ParseEquStatement(Token token)
         {
             Token var = ConsumeIdToken(addIdentifierToSymbolTable:false);
-
-          
-
 
             ConsumeToken(typeof(ToToken));
             Expression val = ParseExpr();
@@ -2390,9 +2404,7 @@ namespace BasicPlusParser
         {
             Token token = PeekNextToken();
             if (token is not IdentifierToken)
-            //if (token.GetType() != typeof(IdentifierToken))
             {
-                //_parseErrors.ReportError(token, message);
                 throw Error(token, message);
             }
             if (addIdentifierToSymbolTable) _symbolTable.AddVariableReference(token);
@@ -2451,14 +2463,12 @@ namespace BasicPlusParser
 
         public void CheckIfJumpLabelsAreDefined()
         {
-            string errMsg = "The label {0} has not been defined.";
             foreach(var label in _symbolTable.LabelReferences)
             {
                if (!_symbolTable.IsLabelDeclared(label))
                 {
-                    _parseErrors.ReportError(label, String.Format(errMsg, label.Text));
-                }
-                
+                    _parseErrors.ReportError(label, $"The label {label.Text} has not been defined.");
+                }      
             }
         }
     }
