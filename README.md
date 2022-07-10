@@ -38,4 +38,13 @@ TODO
 * Integrate the parser with OI.
 * Add code completion.
 * Add code formatting.
-* The unassigned variable analyser can't handle the case when a label spans several blocks (i.e., when a label is in the middle of a for loop). 99.999% of code does not contain such labels, but there are some weird programs created decades ago that do ... Anyway, there is a way to make the unassiagned variable analyser handle this case.
+* The unassigned variable analyser can't handle the case when a label spans several blocks (i.e., when a label is in the middle of a for loop). 99.999% of code does not contain such labels, but there are some weird programs created decades ago that do ... Anyway, there is a way to make the unassiagned variable analyser handle this case:
+```
+// Don't do this.
+loop
+
+my_label:
+
+repeat
+
+```
