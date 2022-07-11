@@ -45,51 +45,20 @@ namespace BasicPlusLangServer
             var doc = _documentManager.GetDocument(identifier.TextDocument.Uri.ToString());
             if (doc != null)
             {
-
-                // Unfortunately the highligting of tokens must be applied in the order in which the tokens appear.
-                // That means we need to merge the two token lists together.
-                int i = 0;
-                int j = 0;
-                while (true)
+                foreach (Token token in doc.Proc.GetTokens())
                 {
-                    if (i < doc.Proc.Tokens.Count && j < doc.Proc.CommentTokens.Count)
-                    {
-                        if (doc.Proc.Tokens[i].Pos < doc.Proc.CommentTokens[j].Pos)
-                        {
-                            ApplyHighlightingToToken(doc.Proc.Tokens[i++], builder);
-                        }
-                        else
-                        {
-                            ApplyHighlightingToToken(doc.Proc.CommentTokens[j++], builder);
-                        }
-                    } 
-                    else if (i < doc.Proc.Tokens.Count)
-                    {
-                        ApplyHighlightingToToken(doc.Proc.Tokens[i++], builder);
-                    }
-                    else if (j < doc.Proc.CommentTokens.Count)
-                    {
-                        ApplyHighlightingToToken(doc.Proc.CommentTokens[j++], builder);
-                    }
-                    else
-                    {
-                        break;
-                    }
+                    ApplyHighlightingToToken(token, builder);
                 }
-               
             }
             return Unit.Task;
         }
 
-
         void ApplyHighlightingToToken(Token token, SemanticTokensBuilder builder)
         {
-
             if (token is EofToken) return;
 
             for (int i = token.LineNo; i <= token.EndLineNo; i++)
             {
-
                 int startCol = token.StartCol;
                 int endCol = token.EndCol;
 

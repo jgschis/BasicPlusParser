@@ -85,7 +85,7 @@ namespace BasicPlusLangServer
             {
                 Diagnostic diagnostic = new()
                 {
-                    Severity = DiagnosticSeverity.Error,
+                    Severity = error.PType switch {ParserDiagnosticType.Warning => DiagnosticSeverity.Warning,_=> DiagnosticSeverity.Error},
                     Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(error.LineNo - 1, error.StartCol, error.EndLineNo - 1, error.EndCol),
                     Message = error.Message,
                     Source = "ex",

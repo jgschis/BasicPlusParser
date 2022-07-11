@@ -49,8 +49,6 @@ namespace BasicPlusLangServer
             return new SymbolInformationOrDocumentSymbolContainer(symbols);
         }
 
-
-
         SymbolKind? GetSymbolKind(BasicPlusParser.Symbol symbol)
         {
             switch (symbol.Kind)

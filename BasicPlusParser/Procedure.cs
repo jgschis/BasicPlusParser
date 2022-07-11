@@ -81,5 +81,39 @@ namespace BasicPlusParser
             // Return closest match
             return Tokens[index];
         }
+
+        // Merges comment and non-comment tokens into single list.
+        public IEnumerable<Token> GetTokens(bool includeComments = false)
+        {
+            int i = 0;
+            int j = 0;
+            while (true)
+            {
+                if (i < Tokens.Count && j < CommentTokens.Count)
+                {
+                    if (Tokens[i].Pos < CommentTokens[j].Pos)
+                    {
+                        yield return Tokens[i++];
+                    }
+                    else
+                    {
+                        yield return CommentTokens[j++];
+                    }
+                }
+                else if (i < Tokens.Count)
+                {
+                    yield return Tokens[i++];
+                }
+                else if (j < CommentTokens.Count)
+                {
+                    yield return CommentTokens[j++];
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }     
     }
 }
+
