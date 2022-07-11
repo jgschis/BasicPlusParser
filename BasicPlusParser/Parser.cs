@@ -226,7 +226,7 @@ namespace BasicPlusParser
                 }
                 else if (token is ForToken)
                 {
-                    return ParseForLoopStmt(token);
+                    return ParseForNextStmt(token);
                 }
                 else if (token is LoopToken)
                 {
@@ -412,6 +412,10 @@ namespace BasicPlusParser
                 {
                     return ParseBRemoveStmt();
                 }
+                else if (token is AbortToken)
+                {
+                    return ParseAbortAllStmt();
+                }
             }
             else if (token is PragmaToken)
             {
@@ -419,7 +423,7 @@ namespace BasicPlusParser
             }
             else if (token is EndToken)
             {
-                return ParseEndStmt();
+                return ParseEndStmt(token);
             }
             else if (token is IfToken)
             {
@@ -589,7 +593,7 @@ namespace BasicPlusParser
             List<Statement> thenBlock = new();
             bool hasThen = false;
             bool hasElse = false;
-            bool isSingleLineThemElseStmt = false;
+            bool isSingleLineThenElseStmt = false;
 
             if (NextTokenIs(out Token thenToken, typeof(ThenToken)))
             {
@@ -597,13 +601,19 @@ namespace BasicPlusParser
                 if (NextTokenIs(typeof(NewLineToken)))
                 {
                     thenBlock = ParseStmts(_ =>PeekNextToken() is EndToken);
-                    Token endToken = ConsumeToken(typeof(EndToken));
 
-                    _regions.Add(new Region(thenToken.LineNo,thenToken.EndCol, endToken.LineNo, endToken.EndCol));
+                    if (NextTokenIs(out Token endToken, typeof(EndToken)))
+                    {
+                        _regions.Add(new Region(thenToken.LineNo, thenToken.EndCol, endToken.LineNo, endToken.EndCol));
+                    }
+                    else
+                    {
+                        _parseErrors.ReportError(_prevToken, "end expected.");
+                    }
                 }
                 else
                 {
-                    isSingleLineThemElseStmt = true;
+                    isSingleLineThenElseStmt = true;
                     thenBlock = ParseStmts(_ => PeekNextToken() is ElseToken || PeekNextToken() is NewLineToken || IsAtEnd() ||
                         (PeekNextToken() is SemiColonToken && PeekNextToken(1) is NewLineToken));
                     if (thenBlock.All(s => s is EmptyStatement) || thenBlock.Count == 0)
@@ -616,15 +626,21 @@ namespace BasicPlusParser
             if (NextTokenIs(out Token elseToken, typeof(ElseToken)))
             {
                 hasElse = true;
-                if (!isSingleLineThemElseStmt && NextTokenIs(typeof(NewLineToken)))
+                if (!isSingleLineThenElseStmt && NextTokenIs(typeof(NewLineToken)))
                 {
                     elseBlock = ParseStmts(() => PeekNextToken() is EndToken);
-                    Token endToken = ConsumeToken(typeof(EndToken));
-                    _regions.Add(new Region(elseToken.LineNo, elseToken.EndCol, endToken.LineNo, endToken.EndCol));
+                    if (NextTokenIs(out Token endToken, typeof(EndToken)))
+                    {
+                        _regions.Add(new Region(elseToken.LineNo, elseToken.EndCol, endToken.LineNo, endToken.EndCol));
+                    }
+                    else
+                    {
+                        _parseErrors.ReportError(PeekNextToken(), "end expected.");
+                    }
                 }
                 else 
                 {     
-                    elseBlock = ParseStmts(() => PeekNextToken() is NewLineToken || IsAtEnd() ||
+                    elseBlock = ParseStmts(() => PeekNextToken() is NewLineToken || IsAtEnd() || PeekNextToken() is ElseToken ||
                       (PeekNextToken() is SemiColonToken && PeekNextToken(1) is NewLineToken));
 
                     if (elseBlock.All(s => s is EmptyStatement) || elseBlock.Count == 0)
@@ -636,7 +652,7 @@ namespace BasicPlusParser
 
             if (!(hasElse || hasThen) && optional == false)
             {
-                throw Error(PeekNextToken(), "Then or else block expected.");
+                throw Error(_prevToken, "Then or else block expected.");
             }
 
             return (thenBlock, elseBlock);
@@ -660,7 +676,6 @@ namespace BasicPlusParser
                 Expr = expr
             };
         }
-
 
         Statement ParseWriteStmt()
         {
@@ -989,7 +1004,7 @@ namespace BasicPlusParser
 
             if (!inLoop)
             {
-                _parseErrors.ReportError(token, "The while statment can only be used in loop.");
+                _parseErrors.ReportError(token, "The while statment can only be used in the top level of a loop.");
             }
 
             return new WhileStatement
@@ -1005,7 +1020,7 @@ namespace BasicPlusParser
 
             if (!inLoop)
             {
-                _parseErrors.ReportError(token, "The until statment can only be used in loop.");
+                _parseErrors.ReportError(token, "The until statment can only be used at the top level of a loop.");
             }
 
             return new UntilStatement
@@ -1058,8 +1073,16 @@ namespace BasicPlusParser
             List<Statement> statements = new();
             ConsumeToken(typeof(NewLineToken), optional: true);
             statements = ParseStmts(() => PeekNextToken() is RepeatToken || IsAtEnd(), inLoop: true);
-            Token repeatToken = ConsumeToken(typeof(RepeatToken));
-            _regions.Add(new Region(token.LineNo, token.EndCol, repeatToken.LineNo, repeatToken.EndCol));
+            if (NextTokenIs(out Token repeatToken, typeof(RepeatToken))){
+                _regions.Add(new Region(token.LineNo, token.EndCol, repeatToken.LineNo, repeatToken.EndCol));
+            } else
+            {
+                _parseErrors.ReportError(token, "repeat expected");
+            }
+
+            if (!statements.Any(s => s is UntilStatement || s is WhileStatement || s is ReturnStatement || s is GoToStatement)){
+                _parseErrors.ReportError(token, "Infinite loop detected. Add a while or until statement.", ParserDiagnosticType.Warning);
+            }
 
             return new LoopRepeatStatement
             {
@@ -1100,7 +1123,7 @@ namespace BasicPlusParser
             };
         }
 
-        public Statement ParseForLoopStmt(Token token)
+        public Statement ParseForNextStmt(Token token)
         {
             List<Statement> statements = new();
             Token startVar = ConsumeIdToken();
@@ -1114,18 +1137,19 @@ namespace BasicPlusParser
                 step = ParseExpr();
             }
 
-            ConsumeToken(typeof(NewLineToken),optional:true);
-            statements = ParseStmts(() => PeekNextToken() is NextToken || IsAtEnd() , inLoop: true);
-            ConsumeToken(typeof(NextToken));
+            ConsumeToken(typeof(NewLineToken), optional: true);
+            statements = ParseStmts(() => PeekNextToken() is NextToken || IsAtEnd(), inLoop: true);
 
-            if (!(PeekNextToken() is NewLineToken || PeekNextToken() is EofToken))
+            if (NextTokenIs(typeof(NextToken)))
             {
-                // Basic + allows you to put an expression after the next keyword. But it has
-                // no significance, so we just eat it.
-                ParseExpr();
+                ConsumeIdToken(optional: true);
+
+                _regions.Add(new Region(token.LineNo, token.EndCol, _prevToken.LineNo, _prevToken.EndCol));
+            } else
+            {
+                _parseErrors.ReportError(token, "next expected.");
             }
-            _regions.Add(new Region(token.LineNo, token.EndCol, _prevToken.LineNo, _prevToken.EndCol));
-            
+
             return new ForNextStatement
             {
                 Start = index,
@@ -1720,11 +1744,11 @@ namespace BasicPlusParser
             };
         }
 
-        Statement ParseEndStmt()
+        Statement ParseEndStmt(Token token)
         {
             if (!IsProgramEnd())
             {
-                throw Error(_prevToken, "End statement used but the program is not done.");
+                throw Error(token, "Statements exists after the end statement.");
             }
 
             return new EndStatement();
@@ -1835,6 +1859,12 @@ namespace BasicPlusParser
                 Else = elseBlock,
                 Then = thenBlock
             };
+        }
+
+        Statement ParseAbortAllStmt()
+        {
+            ConsumeToken(typeof(AllToken));
+            return new AbortAllStatement();
         }
 
         Expression ParseExpr(bool inArray = false, bool optional = false)
@@ -2400,12 +2430,19 @@ namespace BasicPlusParser
             return _tokens[_nextTokenIndex++];
         }
 
-        Token ConsumeIdToken(string message = "Identifier expected.", bool addIdentifierToSymbolTable = true)
+        Token ConsumeIdToken(string message = "Identifier expected.", bool addIdentifierToSymbolTable = true, bool optional = false)
         {
             Token token = PeekNextToken();
             if (token is not IdentifierToken)
             {
-                throw Error(token, message);
+                if (optional)
+                {
+                    return null;
+                }
+                else
+                {
+                    throw Error(token, message);
+                }
             }
             if (addIdentifierToSymbolTable) _symbolTable.AddVariableReference(token);
             return _tokens[_nextTokenIndex++];

@@ -1,6 +1,6 @@
 ﻿namespace BasicPlusParser
 {
-    public class Region
+    public class Region 
     {
         public int StartLineNo { get; set; }
         public int EndLineNo { get; set; }

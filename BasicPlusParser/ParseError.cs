@@ -6,6 +6,15 @@ using System.Threading.Tasks;
 
 namespace BasicPlusParser
 {
+
+    public enum ParserDiagnosticType
+    {
+        Warning,
+        Error,
+        Info
+    }
+
+
     public class ParseError
     {
         public string Message;
@@ -13,5 +22,6 @@ namespace BasicPlusParser
         public int StartCol;
         public int EndCol;
         public int EndLineNo;
+        public ParserDiagnosticType PType;
     }
 }

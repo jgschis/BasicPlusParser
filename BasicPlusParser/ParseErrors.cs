@@ -9,7 +9,7 @@ namespace BasicPlusParser
 
         public List<ParseError> Errors = new();
 
-        public void ReportError(int line ,string message, int startCol, int endCol)
+        public void ReportError(int line ,string message, int startCol, int endCol, ParserDiagnosticType pType = ParserDiagnosticType.Error)
         {
             Errors.Add(new ParseError
             {
@@ -17,12 +17,14 @@ namespace BasicPlusParser
                 Message =message,
                 StartCol = startCol,
                 EndCol = endCol,
-                EndLineNo = line
+                EndLineNo = line,
+                PType = pType
+
             });
             HasError = true;
         }
 
-        public void ReportError(Token token, string message)
+        public void ReportError(Token token, string message, ParserDiagnosticType pType = ParserDiagnosticType.Error)
         {
             int endCol = token.EndCol;
             int endLineNo = token.EndLineNo;
@@ -40,7 +42,8 @@ namespace BasicPlusParser
                 Message = message,
                 StartCol = token.StartCol,
                 EndCol = endCol,
-                EndLineNo = endLineNo
+                EndLineNo = endLineNo,
+                PType = pType
             }); 
             HasError = true;
         }

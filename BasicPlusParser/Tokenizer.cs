@@ -436,6 +436,7 @@ namespace BasicPlusParser
                 "length" => new LengthToken { Text = idOrKeyword },
                 "bremove" => new BRemoveToken { Text = idOrKeyword },
                 "insert" => new InsertDeclarationToken { Text = idOrKeyword },
+                "abort" => new AbortToken { Text = idOrKeyword },
                 "ge" => new GeToken { Text = idOrKeyword },
                 "ne" => new NeToken { Text = idOrKeyword },
                 "lt" => new LtToken { Text = idOrKeyword },
@@ -454,8 +455,8 @@ namespace BasicPlusParser
                 "_gtx" => new GtxToken { Text = idOrKeyword },
                 "_lex" => new LexToken { Text = idOrKeyword },
                 "_gex" => new GexToken { Text = idOrKeyword },
-                "and" => new AndToken { Text = idOrKeyword },
-                "or" => new OrToken { Text = idOrKeyword },
+                //"and" => new AndToken { Text = idOrKeyword },
+                //"or" => new OrToken { Text = idOrKeyword },
                 _ => new IdentifierToken { Text = idOrKeyword }      
             };
         }
