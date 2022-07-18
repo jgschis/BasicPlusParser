@@ -172,21 +172,23 @@ namespace BasicPlusParser
             Token token = GetNextToken();
             if (token is IdentifierToken)
             {
+                Matrix matrix = null;
                 if (IsMatrix(token))
                 {
-                    return ParseMatrixAssignmentStmt(token);
+                    matrix = ParseMatrix(token);
                 }
-                else if (NextTokenIs(typeof(EqualToken)))
-                {
-                    return ParseAssignmentStmt(token);
+
+                if (NextTokenIs(typeof(EqualToken)))
+                {       
+                    return ParseAssignmentStmt(token, matrix);      
                 }
                 else if (NextTokenIs(typeof(LAngleBracketToken)))
                 {
-                    return ParseAngleAssignmentStmt(token);
+                    return ParseAngleAssignmentStmt(token, matrix);
                 }
-                else if (!token.DisallowFunction && NextTokenIs(typeof(LSqrBracketToken)))
+                else if (NextTokenIs(typeof(LSqrBracketToken)))
                 {
-                    return ParseSquareBracketArrayAssignmentStmt(token);
+                    return ParseSquareBracketArrayAssignmentStmt(token, matrix);
                 }
                 else if (NextTokenIs(typeof(ColonToken)))
                 {
@@ -194,25 +196,17 @@ namespace BasicPlusParser
                 }
                 else if (NextTokenIs(typeof(PlusEqualToken)))
                 {
-                    return ParsePlusAssignmentStmt(token);
+                    return ParsePlusAssignmentStmt(token, matrix);
                 }
                 else if (NextTokenIs(typeof(MinusEqualToken)))
                 {
-                    return ParseMinusAssignmentStmt(token);
-                }
-                else if (NextTokenIs(typeof(SlashEqualToken)))
-                {
-                    return ParseDivideAssignmentStmt(token);
-                }
-                else if (NextTokenIs(typeof(StarEqualToken)))
-                {
-                    return ParseMulAssignmentStmt(token);
-                }
+                    return ParseMinusAssignmentStmt(token, matrix);
+                }   
                 else if (NextTokenIs(typeof(ColonEqualToken)))
                 {
-                    return ParseConcatAssignmentStmt(token);
+                    return ParseConcatAssignmentStmt(token, matrix);
                 }
-                else if (!token.DisallowFunction && NextTokenIs(typeof(LParenToken)))
+                else if (!(IsMatrix(token)) && !token.DisallowFunction && NextTokenIs(typeof(LParenToken)))
                 {
                     return ParseFunctionCallStmt(token);
                 }
@@ -755,11 +749,11 @@ namespace BasicPlusParser
             };
         }
 
-        AssignmentStatement ParseAssignmentStmt(Token token)
+        AssignmentStatement ParseAssignmentStmt(Token token, Matrix matrix = null)
         {
             Expression expr = ParseExpr();
             _symbolTable.AddVariableReference(token);
-            return new AssignmentStatement { Value = expr, Variable = new IdExpression(token,IdentifierType.Assignment) };
+            return new AssignmentStatement { Value = expr, Variable = matrix != null? matrix :  new IdExpression(token)};
         }
 
         Statement ParseDeclareStmt()
@@ -971,7 +965,7 @@ namespace BasicPlusParser
             };
         }
 
-        Statement ParseAngleAssignmentStmt(Token token)
+        Statement ParseAngleAssignmentStmt(Token token, Matrix matrix = null)
         {
             List<Expression> indexes = new();
             do
@@ -989,10 +983,15 @@ namespace BasicPlusParser
             ConsumeToken(typeof(EqualToken));
             Expression expr = ParseExpr();
             _symbolTable.AddVariableReference(token);
+
+            if (matrix != null)
+            {
+                matrix.IdentifierType = IdentifierType.Reference;
+            }
             return new AngleArrayAssignmentStatement
             {
                 Indexes = indexes,
-                Variable = new IdExpression(token, IdentifierType.Reference),
+                Variable = matrix != null ? matrix : new IdExpression(token, IdentifierType.Reference),
                 Value = expr
             };
         }
@@ -1208,7 +1207,7 @@ namespace BasicPlusParser
 
         }
 
-        public Statement ParseSquareBracketArrayAssignmentStmt(Token token)
+        public Statement ParseSquareBracketArrayAssignmentStmt(Token token, Matrix matrix = null)
         {
             List<Expression> indexes = new();
             do
@@ -1226,10 +1225,15 @@ namespace BasicPlusParser
             ConsumeToken(typeof(EqualToken));
             Expression expr = ParseExpr();
             _symbolTable.AddVariableReference(token);
+
+            if (matrix != null)
+            {
+                matrix.IdentifierType = IdentifierType.Reference;
+            }
             return new SquareBracketArrayAssignmentStatement
             {
                 Indexes = indexes,
-                Variable = new IdExpression(token, IdentifierType.Reference),
+                Variable = matrix != null? matrix : new IdExpression(token, IdentifierType.Reference),
                 Value = expr
             };
         }
@@ -1301,14 +1305,19 @@ namespace BasicPlusParser
             return gosubStmt;
         }
 
-        Statement ParsePlusAssignmentStmt(Token token)
+        Statement ParsePlusAssignmentStmt(Token token, Matrix matrix = null)
         {
             Expression expr = ParseExpr();
             _symbolTable.AddVariableReference(token);
+
+            if (matrix != null)
+            {
+                matrix.IdentifierType = IdentifierType.Reference;
+            }
             return new PlusAssignmentStatement
             {
                 Value = expr,
-                Variable = new IdExpression(token, IdentifierType.Reference)
+                Variable = matrix != null ? matrix : new IdExpression(token, IdentifierType.Reference)
             };
         }
 
@@ -1322,14 +1331,19 @@ namespace BasicPlusParser
             };
         }
 
-        Statement ParseMinusAssignmentStmt(Token token)
+        Statement ParseMinusAssignmentStmt(Token token, Matrix matrix =null)
         {
             Expression expr = ParseExpr();
             _symbolTable.AddVariableReference(token);
+
+            if (matrix != null)
+            {
+                matrix.IdentifierType = IdentifierType.Reference;
+            }
             return new MinusAssignmentStatement
             {
                 Value = expr,
-                Variable = new IdExpression(token,IdentifierType.Reference)
+                Variable = matrix != null? matrix : new IdExpression(token,IdentifierType.Reference)
             };
         }
 
@@ -1370,14 +1384,20 @@ namespace BasicPlusParser
             };
         }
 
-        Statement ParseConcatAssignmentStmt(Token token)
+        Statement ParseConcatAssignmentStmt(Token token, Matrix matrix = null)
         {
             Expression expr = ParseExpr();
             _symbolTable.AddVariableReference(token);
+
+
+            if (matrix != null)
+            {
+                matrix.IdentifierType = IdentifierType.Reference;
+            }
             return new ConcatAssignmentStatement
             {
                 Value = expr,
-                Variable = new IdExpression(token, IdentifierType.Reference)
+                Variable = matrix != null ? matrix : new IdExpression(token, IdentifierType.Reference)
             };
         }
 
@@ -1806,13 +1826,12 @@ namespace BasicPlusParser
             };
         }
 
-        Statement ParseMatrixAssignmentStmt (Token token)
+        Matrix ParseMatrix(Token token)
         {
-
-            if (!NextTokenIs(typeof(LParenToken))){
+            if (!NextTokenIs(typeof(LParenToken)))
+            {
                 throw Error(token, $"{token.Text} is a matrix and therefore requires a subscript.");
             }
-
 
             Expression row = ParseExpr();
             Expression col = null;
@@ -1821,19 +1840,57 @@ namespace BasicPlusParser
                 col = ParseExpr();
             }
 
+            ConsumeToken(typeof(RParenToken));
+
+            return new Matrix(token, col, row);
+        }
+
+
+
+        Statement ParseMatrixAssignmentStmt (Token token)
+        {
+            if (!NextTokenIs(typeof(LParenToken))){
+                throw Error(token, $"{token.Text} is a matrix and therefore requires a subscript.");
+            }
+
+            Expression row = ParseExpr();
+            Expression col = null;
+            if (NextTokenIs(typeof(CommaToken)))
+            {
+                col = ParseExpr();
+            }
 
             ConsumeToken(typeof(RParenToken));
-            ConsumeToken(typeof(EqualToken));
-            Expression value = ParseExpr();
+
+            Statement statement;
+            if (NextTokenIs(typeof(EqualToken))){
+                Expression value = ParseExpr();
+                statement = new AssignmentStatement { Value = value, Variable = new Matrix(token, col, row) };
+            } else if (NextTokenIs(typeof(PlusEqualToken)))
+            {
+                Expression value = ParseExpr();
+                statement = new AssignmentStatement { Value = value, Variable = new Matrix(token, col, row) };
+            }
+            else if (NextTokenIs(typeof(MinusEqualToken)))
+            {
+                Expression value = ParseExpr();
+                statement = new AssignmentStatement { Value = value, Variable = new Matrix(token, col, row) };
+            }
+            else if (NextTokenIs(typeof(LAngleBracketToken)))
+            {
+                statement = ParseAngleAssignmentStmt(token);
+            }
+            else if (NextTokenIs(typeof(LSqrBracketToken)))
+            {
+                statement = ParseSquareBracketArrayAssignmentStmt(token);
+            }
+            else
+            {
+                throw Error(token, $"{token.Text} is not a valid statement.");
+            }
 
             _symbolTable.AddVariableReference(token);
-            return new MatAssignmentStatement
-            {
-                Value = value,
-                Col = col,
-                Row = row,
-                Variable = new IdExpression(token, IdentifierType.Assignment)
-            };
+            return statement;
         }
 
         Statement ParseOsDeleteStmt()
