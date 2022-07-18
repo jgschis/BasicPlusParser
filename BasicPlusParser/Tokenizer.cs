@@ -103,12 +103,12 @@ namespace BasicPlusParser
                 case '/':
                     if (StartOfStmt() && Match("/")) return ScanSingleLineComment();
                     else if (Match("//")) return new MultiValueDivToken { Text = _source[start.._pos] };
-                    else if (Match("=")) return new SlashEqualToken { Text = _source[start.._pos] };
+                    //else if (Match("=")) return new SlashEqualToken { Text = _source[start.._pos] };
                     else if (Match("*")) return ScanMultiLineComment();
                     else return new SlashToken { Text = _source[start.._pos] };
                 case '*':
                     if (StartOfStmt()) return ScanSingleLineComment();
-                    else if (Match("=")) return new StarEqualToken { Text = _source[start.._pos] };
+                    //else if (Match("=")) return new StarEqualToken { Text = _source[start.._pos] };
                     else if (Match("**")) return new MultiValueMullToken { Text = _source[start.._pos] };
                     else if (Match("*")) return new PowerToken { Text = _source[start.._pos] };
                     else return new StarToken { Text = _source[start.._pos] };
@@ -455,8 +455,8 @@ namespace BasicPlusParser
                 "_gtx" => new GtxToken { Text = idOrKeyword },
                 "_lex" => new LexToken { Text = idOrKeyword },
                 "_gex" => new GexToken { Text = idOrKeyword },
-                //"and" => new AndToken { Text = idOrKeyword },
-                //"or" => new OrToken { Text = idOrKeyword },
+                "and" => new AndToken { Text = idOrKeyword },
+                "or" => new OrToken { Text = idOrKeyword },
                 _ => new IdentifierToken { Text = idOrKeyword }      
             };
         }
