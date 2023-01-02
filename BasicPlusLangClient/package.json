@@ -44,11 +44,11 @@
 		}
 	},
 	"scripts": {
-		"vscode:prepublish": "npm run compile && mkdir .server && dotnet build ../BasicPlusLangServer -o ./.server",
+		"vscode:prepublish": "npm install && npm run compile && mkdir .server && dotnet build ../BasicPlusLangServer -o ./.server",
 		"compile": "tsc -b",
 		"watch": "tsc -b -w",
 		"lint": "eslint ./client/src --ext .ts,.tsx",
-		"postinstall": "cd client && npm installl && cd ..",
+		"postinstall": "cd client && npm install && cd ..",
 		"test": "sh ./scripts/e2e.sh"
 	},
 	"devDependencies": {

@@ -369,3 +369,4 @@ client/node_modules
 client/server
 .vscode-test
 .server
+*.vsix
