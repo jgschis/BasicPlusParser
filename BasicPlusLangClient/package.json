@@ -39,12 +39,17 @@
 					],
 					"default": "off",
 					"description": "Traces the communication between VS Code and the language server."
+				},
+				"languageServerExample.OiPath": {
+					"scope": "window",
+					"type": "string",
+					"description": "Absolute path of directory that contains OpenInsight."
 				}
 			}
 		}
 	},
 	"scripts": {
-		"vscode:prepublish": "npm install && npm run compile && mkdir .server && dotnet build ../BasicPlusLangServer -o ./.server",
+		"vscode:prepublish": "npm install && npm run compile && dotnet build ../BasicPlusLangServer -o ./.server",
 		"compile": "tsc -b",
 		"watch": "tsc -b -w",
 		"lint": "eslint ./client/src --ext .ts,.tsx",
