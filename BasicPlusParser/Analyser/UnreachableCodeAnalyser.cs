@@ -81,6 +81,10 @@ namespace BasicPlusParser.Analyser
                         if (!blockReturns) s.Labels.ForEach(label => UpdateReachabilityGraph(label.Name));
                         blockReturns = true;
                         break;
+
+                    case InsertStatement s:
+                        blockReturns |= AnalyseBlock(s.Statements);
+                        break;
                 }
             }
             return blockReturns;

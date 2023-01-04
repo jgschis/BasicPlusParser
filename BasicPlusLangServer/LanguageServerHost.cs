@@ -17,6 +17,7 @@ namespace BasicPlusLangServer {
 				.WithInput(Console.OpenStandardInput())
 				.WithOutput(Console.OpenStandardOutput())
 				.ConfigureLogging(ConfigureLogging)
+				.WithServices(ConfigureServices)
 				.WithHandler<TextDocumentSyncHandler>()
 				.WithHandler<SemanticTokenHandler>()
 				.WithHandler<FoldingRangeHandler>()
@@ -26,7 +27,6 @@ namespace BasicPlusLangServer {
 				.WithHandler<GetOiStoredProcsHandler>()
 				.WithHandler<DocumentSymbolHandler>()
 				//.WithHandler<CompletionHandler>()				
-				.WithServices(ConfigureServices)
 				.OnInitialize(Initialize);
 		}
 
@@ -34,6 +34,9 @@ namespace BasicPlusLangServer {
 		{
 			_services = services;
 			_services.AddSingleton<TextDocumentManager>();
+
+			var client = OiClient.Client.CreateClient(@"Q:\REVSOFT\OpenInsight10","TVCORYX","TVCORYX","4J94@9fkdjdk4###dd");
+			_services.AddSingleton<OiClient.Client>(client);
 		}
 
 		void ConfigureLogging(ILoggingBuilder logBuilder){

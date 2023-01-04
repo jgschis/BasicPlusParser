@@ -63,6 +63,16 @@ namespace BasicPlusParser.Analyser
 
                 switch (statement)
                 {
+                    case InsertStatement s:
+                        (var insertReturns, var insertVars, var insertLocalVars) = AnalyseCore(s.Statements, definiteInLabel);
+                        definiteFromGosub.UnionWith(insertVars);
+                        if (!insertReturns) {
+                            definiteInLabel.UnionWith(insertVars);
+                        }
+                        if (insertReturns) return (true, definiteFromGosub, definiteInLabel);
+                        break;
+
+
                     case ReturnStatement:
                         return (true, definiteFromGosub, definiteInLabel);
                     case ThenElseStatement s:

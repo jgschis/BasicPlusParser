@@ -19,6 +19,9 @@
 	"activationEvents": ["onLanguage:plaintext"],
 	"main": "./client/out/extension",
 	"contributes": {
+		"commands":[
+			{"command": "OpenInsight.OpenStoredProcs","title":"Open Stored Procedures"}
+		],
 		"configuration": {
 			"type": "object",
 			"title": "Example configuration",

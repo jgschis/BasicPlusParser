@@ -10,6 +10,8 @@ namespace BasicPlusParser.Statements
     public class InsertStatement : Statement
     {
         public IdExpression Name;
+        public List<Statement> Statements;
+
 
     }
 }

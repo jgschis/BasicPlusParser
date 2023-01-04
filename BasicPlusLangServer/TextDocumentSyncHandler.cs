@@ -16,13 +16,15 @@ namespace BasicPlusLangServer
         readonly ILogger _logger;
         readonly ILanguageServerFacade _facade;
         readonly TextDocumentManager _documents;
+        readonly OiClient.Client _client;
 
         public TextDocumentSyncHandler(ILogger<TextDocumentSyncHandler> logger,
-            ILanguageServerFacade facade, TextDocumentManager textDocumentManager)
+            ILanguageServerFacade facade, TextDocumentManager textDocumentManager, OiClient.Client client)
         {
             _logger = logger;
             _facade = facade;
             _documents = textDocumentManager;
+            _client = client;
         }
 
         public override Task<Unit> Handle(DidCloseTextDocumentParams parms, CancellationToken token){
@@ -73,7 +75,7 @@ namespace BasicPlusLangServer
 
         Procedure ValidateDocument(TextDocument textDocument)
         {
-            Parser parser = new Parser(textDocument.Text);
+            Parser parser = new Parser(textDocument.Text, textDocument.Uri.ToString(),_client);
             Procedure program = parser.Parse();
             UnreachableCodeAnalyser uca = new(program);
             uca.Analyse();
@@ -88,8 +90,6 @@ namespace BasicPlusLangServer
                     Severity = error.PType switch {ParserDiagnosticType.Warning => DiagnosticSeverity.Warning,_=> DiagnosticSeverity.Error},
                     Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(error.LineNo - 1, error.StartCol, error.EndLineNo - 1, error.EndCol),
                     Message = error.Message,
-                    Source = "ex",
-                    Code = "a"
                 };
                 diagnoistics.Add(diagnostic);
             }
@@ -101,8 +101,6 @@ namespace BasicPlusLangServer
                     Severity = DiagnosticSeverity.Warning,
                     Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(stmt.LineNo - 1, stmt.LineCol, stmt.LineNo - 1, stmt.EndCol),
                     Message = "Unreachable code detected.",
-                    Source = "ex",
-                    Code = "a"
                 };
                 diagnoistics.Add(diagnostic);
             }
@@ -117,8 +115,6 @@ namespace BasicPlusLangServer
                     Severity = DiagnosticSeverity.Warning,
                     Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(token.LineNo - 1, token.StartCol, token.LineNo - 1, token.EndCol),
                     Message = $"The variable {token.Text} is not definitively assigned.",
-                    Source = "ex",
-                    Code = "a"
                 };
                 diagnoistics.Add(diagnostic);
             }
@@ -131,8 +127,6 @@ namespace BasicPlusLangServer
                     Severity = DiagnosticSeverity.Warning,
                     Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(label.LineNo - 1, label.LineCol, label.LineNo - 1, label.EndCol),
                     Message = "Unreachable label detected.",
-                    Source = "ex",
-                    Code = "a"
                 };
                 diagnoistics.Add(diagnostic);
             }
@@ -144,8 +138,6 @@ namespace BasicPlusLangServer
                     Severity = DiagnosticSeverity.Warning,
                     Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(label.LineNo - 1, label.LineCol, label.LineNo - 1, label.EndCol),
                     Message = "Label reached via fallthrough. Is this intentional?",
-                    Source = "ex",
-                    Code = "a"
                 };
                 diagnoistics.Add(diagnostic);
             }

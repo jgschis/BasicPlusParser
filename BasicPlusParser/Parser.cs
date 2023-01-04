@@ -4,12 +4,14 @@ using System.Linq;
 using BasicPlusParser.Tokens;
 using BasicPlusParser.Statements;
 using BasicPlusParser.Statements.Expressions;
+using OiClient;
 
 namespace BasicPlusParser
 {
     public class Parser
     {
         readonly string _text;
+        readonly string _fileName;
 
         int _nextTokenIndex = 0;
         List<Token> _tokens;
@@ -21,9 +23,26 @@ namespace BasicPlusParser
         List<Region> _regions = new();
         Symbols _symbolTable = new();
 
-        public Parser(string text)
+        Client _oiClient;
+        
+        // We use this to stop an infinite loop caused by circular inserts.
+        Stack<string> _insertsProcessed = new();
+
+
+        public Parser(string text, string fileName, Client client)
         {
             _text = text;
+            _oiClient = client;
+            _fileName = fileName;
+        }
+
+        private Parser(string text,string fileName, Parser parser) {
+            _parseErrors = parser._parseErrors;
+            _symbolTable = parser._symbolTable;
+            _oiClient = parser._oiClient;
+            _text = text;
+            _fileName = fileName;
+            _insertsProcessed = parser._insertsProcessed;
         }
 
         public Procedure Parse()
@@ -34,7 +53,7 @@ namespace BasicPlusParser
                 return new Procedure();
             }
 
-            Tokenizer tokenizer = new(_text);
+            Tokenizer tokenizer = new(_text, _fileName);
             TokenizerOutput tokenizerOutput = tokenizer.Tokenise();
             _tokens = tokenizerOutput.Tokens;
             _commentTokens = tokenizerOutput.CommentTokens;
@@ -138,12 +157,12 @@ namespace BasicPlusParser
             return new Procedure(procedureName, procedureType);
         }
 
-        public List<Statement> ParseStmts(Func<bool> stop, bool inLoop = false)
+        List<Statement> ParseStmts(Func<bool> stop, bool inLoop = false)
         {
             return ParseStmts(_ => stop(), inLoop: inLoop);
         }
 
-        public List<Statement> ParseStmts(Func<List<Statement>, bool> stop, bool inLoop = false)
+        List<Statement> ParseStmts(Func<List<Statement>, bool> stop, bool inLoop = false)
         {
             List<Statement> statements = new();
             while (!stop(statements) && !IsAtEnd())
@@ -167,7 +186,7 @@ namespace BasicPlusParser
             return statements;
         }
 
-        public Statement ParseStmt(bool inLoop = false)
+        Statement ParseStmt(bool inLoop = false)
         {
             Token token = GetNextToken();
             if (token is IdentifierToken)
@@ -589,11 +608,19 @@ namespace BasicPlusParser
             bool hasElse = false;
             bool isSingleLineThenElseStmt = false;
 
+            
             if (NextTokenIs(out Token thenToken, typeof(ThenToken)))
             {
                 hasThen = true;
-                if (NextTokenIs(typeof(NewLineToken)))
+                if (NextTokenIs(typeof(NewLineToken)) || NextTokenIs(typeof(SemiColonToken)))
                 {
+                    if (_prevToken is SemiColonToken) {
+                        while (NextTokenIs(typeof(SemiColonToken))) ;
+                        if (!NextTokenIs(typeof(NewLineToken))){
+                            _parseErrors.ReportError(_prevToken, "new line expected after semicolon.");
+                        }
+                    }
+
                     thenBlock = ParseStmts(_ =>PeekNextToken() is EndToken);
 
                     if (NextTokenIs(out Token endToken, typeof(EndToken)))
@@ -620,8 +647,17 @@ namespace BasicPlusParser
             if (NextTokenIs(out Token elseToken, typeof(ElseToken)))
             {
                 hasElse = true;
-                if (!isSingleLineThenElseStmt && NextTokenIs(typeof(NewLineToken)))
+
+
+                if (NextTokenIs(typeof(NewLineToken)) || NextTokenIs(typeof(SemiColonToken)))
                 {
+                    if (_prevToken is SemiColonToken) {
+                        while (NextTokenIs(typeof(SemiColonToken))) ;
+                        if (!NextTokenIs(typeof(NewLineToken))) {
+                            _parseErrors.ReportError(_prevToken, "new line expected after semicolon.");
+                        }
+                    }
+
                     elseBlock = ParseStmts(() => PeekNextToken() is EndToken);
                     if (NextTokenIs(out Token endToken, typeof(EndToken)))
                     {
@@ -654,7 +690,11 @@ namespace BasicPlusParser
 
         Statement ParseMatWriteStmt()
         {
-            Expression expr = ParseExpr();
+            Token matrix = ConsumeIdToken();
+            if (!IsMatrix(matrix)) {
+                _parseErrors.ReportError(matrix, $"The identifier {matrix.Text} must be dimensioned.");
+            }
+
             ConsumeToken("Expected on or to", false, typeof(OnToken), typeof(ToToken));
             Expression handle = ParseExpr();
             ConsumeToken(typeof(CommaToken));
@@ -667,7 +707,7 @@ namespace BasicPlusParser
                 Handle = handle,
                 Key = key,
                 Then = thenBlock,
-                Expr = expr
+                Expr = new IdExpression(matrix,IdentifierType.Reference)
             };
         }
 
@@ -692,7 +732,11 @@ namespace BasicPlusParser
 
         Statement ParseMatReadStmt()
         {
-            Token var = ConsumeIdToken();
+            Token matrix = ConsumeIdToken();
+            if (!IsMatrix(matrix)) {
+                _parseErrors.ReportError(matrix, $"The identifier {matrix.Text} must be dimensioned.");
+            }
+
             ConsumeToken(typeof(FromToken));
             Expression handle = null;
             Expression cursor = null;
@@ -716,7 +760,7 @@ namespace BasicPlusParser
                 Handle = handle,
                 Key = key,
                 Then = thenBlock,
-                Var = new IdExpression(var)
+                Var = new IdExpression(matrix, IdentifierType.Reference)
             };
         }
 
@@ -936,7 +980,7 @@ namespace BasicPlusParser
         Case ParseCase()
         {
             Expression cond = ParseExpr();
-            ConsumeSemiColonsUntilEndOfLine();
+            ConsumeToken(typeof(NewLineToken), optional:true);
             List<Statement> statements = ParseStmts(() => _nextToken is  CaseToken || _nextToken is EndToken || _nextToken is EofToken);
             return new Case
             {
@@ -1089,7 +1133,7 @@ namespace BasicPlusParser
             };
         }
 
-        public Statement ParseMatStmt()
+        Statement ParseMatStmt()
         {
             Token matrix = ConsumeIdToken();
             if (!IsMatrix(matrix))
@@ -1122,7 +1166,7 @@ namespace BasicPlusParser
             };
         }
 
-        public Statement ParseForNextStmt(Token token)
+        Statement ParseForNextStmt(Token token)
         {
             List<Statement> statements = new();
             Token startVar = ConsumeIdToken();
@@ -1207,7 +1251,7 @@ namespace BasicPlusParser
 
         }
 
-        public Statement ParseSquareBracketArrayAssignmentStmt(Token token, Matrix matrix = null)
+        Statement ParseSquareBracketArrayAssignmentStmt(Token token, Matrix matrix = null)
         {
             List<Expression> indexes = new();
             do
@@ -1247,7 +1291,7 @@ namespace BasicPlusParser
             };
         }
 
-        public Statement ParseSwapStmt()
+        Statement ParseSwapStmt()
         {
             Expression oldVal = ParseExpr();
             ConsumeToken(typeof(WithToken));
@@ -1325,9 +1369,32 @@ namespace BasicPlusParser
         {
             Token insert = ConsumeIdToken(addIdentifierToSymbolTable: false);
             _symbolTable.AddInsert(insert);
-            return new InsertStatement
-            {
-                Name = new IdExpression(insert, IdentifierType.Insert)
+
+
+            List<Statement> insertStatements;
+            if (!_insertsProcessed.Contains(insert.Text.ToLower())) {
+
+                try {
+                    _insertsProcessed.Push(insert.Text.ToLower());
+
+                    string insertSourceCode = _oiClient.GetInsert(insert.Text);
+
+                    Parser parser = new Parser(insertSourceCode, insert.Text, this);
+                    var insertAst = parser.Parse();
+                    insertStatements = insertAst.Statements;
+                } finally {
+                    _insertsProcessed.Pop();
+                }
+
+            } else {
+                _parseErrors.ReportError(insert, "This insert creates a cycle.");
+                insertStatements = new();
+            }
+
+
+            return new InsertStatement {
+                Name = new IdExpression(insert, IdentifierType.Insert),
+                Statements = insertStatements
             };
         }
 
@@ -1978,7 +2045,7 @@ namespace BasicPlusParser
                 typeof(HashTagToken), typeof(GeToken), typeof(LteToken),typeof(EqToken),typeof(NeToken),
                 typeof(LtToken),typeof(LeToken),typeof(GtToken),typeof(EqcToken),typeof(NecToken),
                 typeof(LtcToken),typeof(LecToken),typeof(GtcToken),typeof(GecToken),typeof(EqxToken),
-                typeof(NexToken),typeof(LtxToken),typeof(GtxToken),typeof(LexToken),typeof(GexToken), typeof(ExclamToken)))
+                typeof(NexToken),typeof(LtxToken),typeof(GtxToken),typeof(LexToken),typeof(GexToken), typeof(ExclamToken), typeof(DoubleEqualToken)))
             {
                 if (optoken is RAngleBracketToken && inArray)
                 {
@@ -2339,7 +2406,7 @@ namespace BasicPlusParser
         Expression ParseFunc(Token token, bool mustReturnValue = true, bool declarationRequired = true)
         {
             token.LsClass = "function";
-            if (declarationRequired)
+            if (declarationRequired && !BuiltinFunctions.IsBuiltInFunction(token.Text))
             {
                 if (mustReturnValue)
                 {
@@ -2555,7 +2622,7 @@ namespace BasicPlusParser
             return new ParseException(token, message);
         }
 
-        public void CheckIfJumpLabelsAreDefined()
+        void CheckIfJumpLabelsAreDefined()
         {
             foreach(var label in _symbolTable.LabelReferences)
             {

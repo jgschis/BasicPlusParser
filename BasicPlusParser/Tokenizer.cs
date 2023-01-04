@@ -8,6 +8,8 @@ namespace BasicPlusParser
     public class Tokenizer
     {
         readonly string _source;
+        readonly string _fileName;
+
         int _pos = 0;
         int _col = 0;
         int _lineNo = 1;
@@ -17,9 +19,10 @@ namespace BasicPlusParser
         Token _prevToken => _tokens.Count > 0 ? _tokens.Last() : null;
         readonly ParseErrors _tokenErrors = new();
 
-        public Tokenizer(string text)
+        public Tokenizer(string text, string fileName)
         {
             _source = text;
+            _fileName = fileName;
         }
 
         public TokenizerOutput Tokenise()
@@ -37,6 +40,7 @@ namespace BasicPlusParser
                     matchedToken.StartCol = startCol;
                     matchedToken.EndCol = _col;
                     matchedToken.EndLineNo = _lineNo;
+                    matchedToken.FileName = _fileName;
 
                     if (matchedToken is WhiteSpaceToken && (_prevToken is IfToken || _prevToken is ReturnToken ||
                         _prevToken is WhileToken || _prevToken is UntilToken))
@@ -82,43 +86,44 @@ namespace BasicPlusParser
             switch (character)
             {
                 case '=':
+                    if (Match("=", ignoreWhitespace: true)) return new DoubleEqualToken { Text = _source[start.._pos] };
                     return new EqualToken { Text = _source[start.._pos] };
                 case '"':
                 case '\'':
                     return ScanStringLiteral(_source[start]);
                 case '<':
-                    if (Match("=")) return new LteToken { Text = _source[start.._pos] };
+                    if (Match("=", ignoreWhitespace: true)) return new LteToken { Text = _source[start.._pos] };
                     else return new LAngleBracketToken { Text = _source[start.._pos] };
                 case '#':
                     if (Match("pragma")) return new PragmaToken { Text = _source[start.._pos] };
                     else return new HashTagToken { Text = _source[start.._pos] };
                 case '+':
-                    if (Match("++")) return new MultiValueAddToken { Text = _source[start.._pos] };
-                    else if (Match('=')) return new PlusEqualToken { Text = _source[start.._pos] };
+                    if (Match("++", ignoreWhitespace:true)) return new MultiValueAddToken { Text = _source[start.._pos] };
+                    else if (Match("=", ignoreWhitespace: true)) return new PlusEqualToken { Text = _source[start.._pos] };
                     else return new PlusToken { Text = _source[start.._pos] };
                 case '-':
-                    if (Match("--")) return new MultiValueSubToken { Text = _source[start.._pos] };
-                    else if (Match("=")) return new MinusEqualToken { Text = _source[start.._pos] };
+                    if (Match("--", ignoreWhitespace: true)) return new MultiValueSubToken { Text = _source[start.._pos] };
+                    else if (Match("=", ignoreWhitespace: true)) return new MinusEqualToken { Text = _source[start.._pos] };
                     else return new MinusToken { Text = _source[start.._pos] };
                 case '/':
                     if (StartOfStmt() && Match("/")) return ScanSingleLineComment();
-                    else if (Match("//")) return new MultiValueDivToken { Text = _source[start.._pos] };
+                    else if (Match("//", ignoreWhitespace: true)) return new MultiValueDivToken { Text = _source[start.._pos] };
                     //else if (Match("=")) return new SlashEqualToken { Text = _source[start.._pos] };
                     else if (Match("*")) return ScanMultiLineComment();
                     else return new SlashToken { Text = _source[start.._pos] };
                 case '*':
                     if (StartOfStmt()) return ScanSingleLineComment();
                     //else if (Match("=")) return new StarEqualToken { Text = _source[start.._pos] };
-                    else if (Match("**")) return new MultiValueMullToken { Text = _source[start.._pos] };
-                    else if (Match("*")) return new PowerToken { Text = _source[start.._pos] };
+                    else if (Match("**", ignoreWhitespace: true)) return new MultiValueMullToken { Text = _source[start.._pos] };
+                    else if (Match("*", ignoreWhitespace: true)) return new PowerToken { Text = _source[start.._pos] };
                     else return new StarToken { Text = _source[start.._pos] };
                 case '!':
-                    if (Match("=")) return new ExcalmEqToken { Text = _source[start.._pos] };
+                    if (Match("=", ignoreWhitespace: true)) return new ExcalmEqToken { Text = _source[start.._pos] };
                     else if (StartOfStmt()) return ScanSingleLineComment();
                     else return new ExclamToken { Text = _source[start.._pos] };
                 case ':':
-                    if (Match("::")) return new MultiValueConcatToken { Text = _source[start.._pos] };
-                    else if (Match("=")) return new ColonEqualToken { Text = _source[start.._pos] };
+                    if (Match("::", ignoreWhitespace: true)) return new MultiValueConcatToken { Text = _source[start.._pos] };
+                    else if (Match("=", ignoreWhitespace: true)) return new ColonEqualToken { Text = _source[start.._pos] };
                     else return new ColonToken { Text = _source[start.._pos] };
                 case '>':
                     return new RAngleBracketToken { Text = _source[start.._pos] };
@@ -147,7 +152,7 @@ namespace BasicPlusParser
                 case '@':
                     return ScanSystemVariableOrAtOperator();
                 case '\r':
-                    Match('\n');
+                    Match("\n");
                     IncrementLineNo();
                     while (Match("\r\n"))
                     {
@@ -158,7 +163,7 @@ namespace BasicPlusParser
                 case '\t':
                 case '\f':
                 case '\v':
-                    while (Match(' ') || Match('\t') || Match('\f') || Match('\v'));
+                    while (Match(" ") || Match("\t") || Match("\f") || Match("\v"));
                     return new WhiteSpaceToken { Text = _source[start.._pos] };
                 default:
                     if (IsIdentifierOrKeyWord(character))
@@ -171,7 +176,7 @@ namespace BasicPlusParser
                     }
                     else
                     {
-                        _tokenErrors.ReportError(_lineNo, $"Unmatched character.",_col,_col);
+                        _tokenErrors.ReportError(_lineNo, $"Unmatched character.",_col,_col, _fileName);
                         return null;
                     }
             }
@@ -212,7 +217,7 @@ namespace BasicPlusParser
             {
                 char chr = Advance();
                 if (chr == '\r') IncrementLineNo();
-                if (chr == '*' && Match('/')) {
+                if (chr == '*' && Match("/")) {
                     return new CommentToken { Text = _source[start.._pos] };
                 }
             }
@@ -247,9 +252,9 @@ namespace BasicPlusParser
                 chars.Add(Advance());
             }
 
-            if (!Match(delim))
+            if (!Match(delim.ToString()))
             {
-                _tokenErrors.ReportError(_lineNo, $"String must be enclosed by {delim}.",_col,_col);
+                _tokenErrors.ReportError(_lineNo, $"String must be enclosed by {delim}.",_col,_col, _fileName);
             }
 
 
@@ -480,7 +485,7 @@ namespace BasicPlusParser
                 Advance();
             }
 
-            if (isHexLiteral) Match('\\');
+            if (isHexLiteral) Match("\\");
            
             string number = _source[startPos.._pos];
 
@@ -488,21 +493,21 @@ namespace BasicPlusParser
             {
                 if (number.Contains('.'))
                 {
-                    _tokenErrors.ReportError(_lineNo, "Hex literal cannot contain a decimal point.", startCol, _col);
+                    _tokenErrors.ReportError(_lineNo, "Hex literal cannot contain a decimal point.", startCol, _col, _fileName);
                 }
                 else if (number.StartsWith('\\') && (number.Last() != '\\' || number.Length == 1))
                 {
-                    _tokenErrors.ReportError(_lineNo, "Hex literal must be terminated by \\.", startCol, _col);
+                    _tokenErrors.ReportError(_lineNo, "Hex literal must be terminated by \\.", startCol, _col, _fileName);
                 }
                 else if ((number.StartsWith("0x",StringComparison.OrdinalIgnoreCase)  || number.StartsWith('\\') )&& number.Length < 3)
                 {
-                    _tokenErrors.ReportError(_lineNo, "Invalid hex literal.", startCol, _col);
+                    _tokenErrors.ReportError(_lineNo, "Invalid hex literal.", startCol, _col, _fileName);
                 }
                 
             }
             else if ((number.Last() == '.' || number.Count(x => x == '.') > 1))
             {
-                _tokenErrors.ReportError(_lineNo, "The number contains an invalid deciaml point.", startCol, _col);
+                _tokenErrors.ReportError(_lineNo, "The number contains an invalid deciaml point.", startCol, _col, _fileName);
             }
 
             return new NumberToken { Text = number };
@@ -513,14 +518,14 @@ namespace BasicPlusParser
             return _pos >= _source.Length;
         }
 
-        bool Match(char expected)
+        /*bool Match(char expected)
         {
             if (IsAtEnd()) return false;
             if (_source[_pos] != expected) return false;
 
             IncrementPos();
             return true;
-        }
+        }*/
 
         char Advance()
         {
@@ -529,15 +534,35 @@ namespace BasicPlusParser
             return c;
         }
 
-        bool Match(string expected)
+        bool Match(string expected, bool ignoreWhitespace = false)
         {
             if (IsAtEnd()) return false;
+
+           // if (ignoreWhitespace) {
+            int startPos = _pos;
+            int startCol = _col;
+
+            foreach (var chr in expected) {
+                while (ignoreWhitespace && Peek() == ' ') { Advance(); };
+                if (IsAtEnd() || !Peek().ToString().Equals(chr.ToString(), StringComparison.OrdinalIgnoreCase)) {
+                    // We looked ahead but failed to find the expected string, so let's restore and move on.
+                    _pos = startPos;
+                    _col = startCol;
+                    return false;
+                } else {
+                    IncrementPos();
+                }
+            }
+               // }
+                // If we got here, then we found the expected string.
+                return true;
+            /*
             if (_source.Substring(_pos).StartsWith(expected, StringComparison.OrdinalIgnoreCase))
             {
                 IncrementPos(expected.Length);
                 return true;
             }
-            return false;
+            return false;*/
         }
 
         char Peek()

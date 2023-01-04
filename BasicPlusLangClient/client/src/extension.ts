@@ -3,10 +3,12 @@
  * Licensed under the MIT License. See License.txt in the project root for license information.
  * ------------------------------------------------------------------------------------------ */
 
+import { Console } from 'console';
 import * as path from 'path';
-import { workspace, ExtensionContext } from 'vscode';
+import { workspace, ExtensionContext, commands, window } from 'vscode';
 
 import {
+	CancellationToken,
 	LanguageClient,
 	LanguageClientOptions,
 	ServerOptions,
@@ -46,8 +48,21 @@ export function activate(context: ExtensionContext) {
 		clientOptions
 	);
 
+	
 	// Start the client. This will also launch the server
 	client.start();
+
+	const disposable = commands.registerCommand('OpenInsight.OpenStoredProcs', () => {
+		client.onReady().then(async () => {
+			const  result =  await client.sendRequest("openInsight/GetStoredProcList", CancellationToken.None) as any[];
+			const pick = await window.showQuickPick(result.map( (v) =>v.name )) as string;
+			window.showInformationMessage(pick);
+		});
+	});
+		
+	context.subscriptions.push(disposable); 
+		
+
 }
 
 export function deactivate(): Thenable<void> | undefined {

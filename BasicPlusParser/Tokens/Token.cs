@@ -11,5 +11,6 @@
         // This is used by the langauge server protocol to implement highlighting.
         public virtual string LsClass { get; set; } = "";
         public int EndLineNo { get; set; }
+        public string FileName {get;set;}
     }
 }

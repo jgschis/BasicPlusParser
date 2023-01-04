@@ -23,5 +23,6 @@ namespace BasicPlusParser
         public int EndCol;
         public int EndLineNo;
         public ParserDiagnosticType PType;
+        public string FileName;
     }
 }

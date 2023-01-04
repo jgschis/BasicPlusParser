@@ -18,6 +18,10 @@ namespace BasicPlusLangServer
     public class StoredProc
     {
         public string Name { get; set; }
+
+        public StoredProc(string name){
+            Name = name;
+        }
     }
 
     [Parallel, Method("openInsight/GetStoredProcList")]
@@ -33,10 +37,18 @@ namespace BasicPlusLangServer
 
     public class GetOiStoredProcsHandler : IGetCodeHandler
     {
+        OiClient.Client _client;
+
+        public GetOiStoredProcsHandler (OiClient.Client client){
+            _client = client;
+        }
+
+
         public  Task<Container<StoredProc>?> Handle(GetCodeHandleRequest request, CancellationToken cancellationToken)
         {
-            List<StoredProc> sp = new();
-            sp.Add(new StoredProc { Name ="hello world"});
+            var procs = _client.GetAllStoredProcs();
+
+            List<StoredProc> sp = procs.Select(p=>new StoredProc(p)).ToList();
             return Task.FromResult<Container<StoredProc>?>(new Container<StoredProc>(sp.ToArray()));
         }
     }
