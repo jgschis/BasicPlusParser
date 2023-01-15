@@ -35,7 +35,6 @@ namespace BasicPlusLangServer {
 			_services = services;
 			_services.AddSingleton<TextDocumentManager>();
 
-			var client = OiClient.Client.CreateClient(@"Q:\REVSOFT\OpenInsight10","TVCORYX","TVCORYX","4J94@9fkdjdk4###dd");
 			_services.AddSingleton<OiClient.Client>(client);
 		}
 
