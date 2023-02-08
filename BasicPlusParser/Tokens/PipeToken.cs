@@ -1,6 +1,6 @@
 ﻿namespace BasicPlusParser.Tokens
 {
-    public class CommaToken : Token
+    public class PipeToken : Token
     {
     }
 }

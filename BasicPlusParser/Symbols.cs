@@ -10,7 +10,8 @@ namespace BasicPlusParser
         public List<Token> LabelReferences = new();
         public List<Token> ProcedureParameters = new();
 
-        public Dictionary<string, Symbol> _Symbols = new();
+        public Dictionary<string, Symbol> _Symbols { get; private set; } = new();
+
         public Dictionary<string, SymbolReference> SymbolIndex = new();
 
         bool AddSymbol(Symbol symbol)
@@ -32,7 +33,7 @@ namespace BasicPlusParser
         void UpdateIndex(Token token, Symbol symbol)
         {
             SymbolReference reference = new SymbolReference(symbol, token);
-            string key = $"{token.LineNo}.{token.StartCol}";
+            string key = $"{token.LineNo}.{token.StartCol}.{token.FileName}";
             SymbolIndex.TryAdd(key, reference);
             symbol.References.Add(reference);
         }
@@ -43,7 +44,7 @@ namespace BasicPlusParser
             AddSymbol(symbol);
         }
 
-        public void AddSubroutineDeclaation(Token token)
+        public void AddSubroutineDeclaration(Token token)
         {
             Symbol symbol = new(token, SymbolKind.Subroutine);
             AddSymbol(symbol);
@@ -155,12 +156,45 @@ namespace BasicPlusParser
             return false;
         }
 
+         public bool IsMatrixDeclared(Token token){
+            if (_Symbols.ContainsKey(GetSymbolKey(SymbolKind.Equate, token))) {
+                return true;
+            }
+
+            if (!_Symbols.TryGetValue(GetSymbolKey(SymbolKind.Variable, token), out Symbol symbol)){
+                return false;
+            }
+
+            // If the symbol is defined as a matrix parameter, then that's OK.
+            if (symbol.Scope == VariableScope.Parameter && symbol.Type == VariableType.Matrix) {
+                return false;
+            }
+
+            return true;
+        }
+
+        public bool IsCommonBlockNameDefined(Token token)
+        {
+            return _Symbols.ContainsKey(GetSymbolKey(SymbolKind.CommonLabel, token));
+        }
+
+        public bool IsParameterDefined(Token token)
+        {
+            if (_Symbols.TryGetValue(GetSymbolKey(SymbolKind.Variable, token), out Symbol symbol)){
+                return symbol.Scope == VariableScope.Parameter;
+            } else
+            {
+                return false;
+            }
+        }
+
         public bool ContainsEquateOrVaraible(Token token)
         {
             return _Symbols.ContainsKey(GetSymbolKey(SymbolKind.Equate, token)) ||
                     _Symbols.ContainsKey(GetSymbolKey(SymbolKind.Variable, token));
         }
 
+       
         public void AddVariableReference(Token token, VariableScope scope = VariableScope.Local)
         {
             Symbol symbol;
@@ -180,22 +214,6 @@ namespace BasicPlusParser
                 }
                 AddSymbol(new Symbol(token, SymbolKind.Variable, scope: scope));
             }
-
-        }
-
-        public bool IsCommonBlockNameDefined(Token token)
-        {
-            return _Symbols.ContainsKey(GetSymbolKey(SymbolKind.CommonLabel, token));
-        }
-
-        public bool IsParameterDefined(Token token)
-        {
-            if (_Symbols.TryGetValue(GetSymbolKey(SymbolKind.Variable, token), out Symbol symbol)){
-                return symbol.Scope == VariableScope.Parameter;
-            } else
-            {
-                return false;
-            }
         }
 
         public void AddParameter(Token token, bool isMatrix = false)
@@ -210,6 +228,18 @@ namespace BasicPlusParser
             }
             AddSymbol(symbol);
             ProcedureParameters.Add(token);
+        }
+
+        public bool IsCommonVariable(Token token) {
+            if (!_Symbols.TryGetValue(GetSymbolKey(SymbolKind.Variable, token), out Symbol symbol)){
+                return false;
+            }
+
+            return symbol.Scope == VariableScope.Common;
+        }
+
+        public bool TryGetInsertSymbol(string insertName, out Symbol symbol) {
+            return _Symbols.TryGetValue(GetSymbolKey(SymbolKind.Insert, insertName),out symbol);
         }
     }
 }

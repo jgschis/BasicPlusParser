@@ -2,11 +2,6 @@
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace BasicPlusLangServer
 {
@@ -29,7 +24,7 @@ namespace BasicPlusLangServer
                 return new LocationContainer();
             }
 
-            Symbol symbol = doc.Proc.GetSymbol(request.Position.Line + 1, request.Position.Character);
+            Symbol symbol = doc.Proc.GetSymbol(request.Position.Line + 1, request.Position.Character, request.TextDocument.Uri.ToString());
             if (symbol == null)
             {
                 return new LocationContainer();
@@ -40,7 +35,7 @@ namespace BasicPlusLangServer
             {
                 locations.Add(new Location
                 {
-                    Uri = request.TextDocument.Uri,
+                    Uri = symbol.Token.FileName,
                     Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(reference.Token.LineNo - 1, reference.Token.StartCol, reference.Token.LineNo- 1, reference.Token.EndCol)
                 });
             }
@@ -52,7 +47,7 @@ namespace BasicPlusLangServer
         {
             return new ReferenceRegistrationOptions()
             {
-                DocumentSelector = DocumentSelector.ForPattern(@"**/*.txt")
+                DocumentSelector = DocumentSelector.ForPattern(@"**/*.bp")
             };
         }
     }

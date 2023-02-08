@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using System.Reflection;
-using System;
 using BasicPlusParser.Statements.Expressions;
 using BasicPlusParser.Tokens;
 
@@ -11,10 +10,14 @@ namespace BasicPlusParser
         public int LineNo;
         public int LineCol;
         public int EndCol;
+        public string FileName;
+
+        protected static readonly TokenEqualityComparer tokenEqualityComparer = new TokenEqualityComparer();
+
       
         public virtual HashSet<Token> GetAssignedVars()
         {
-            HashSet<Token> assignedVars = new(new TokenEqualityComparer());
+            HashSet<Token> assignedVars = new(tokenEqualityComparer);
 
             if (this is IdExpression es && es.IdentifierType == IdentifierType.Assignment)
             {
@@ -47,7 +50,7 @@ namespace BasicPlusParser
 
         public virtual HashSet<Token> GetReferencedVars()
         {
-            HashSet<Token> referencedVars = new(new TokenEqualityComparer());
+            HashSet<Token> referencedVars = new(tokenEqualityComparer);
 
             if (this is IdExpression es && es.IdentifierType == IdentifierType.Reference)
             {

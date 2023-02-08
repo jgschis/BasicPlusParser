@@ -70,7 +70,7 @@ namespace BasicPlusLangServer
         {
             return new DocumentSymbolRegistrationOptions
             {
-                DocumentSelector = DocumentSelector.ForPattern(@"**/*.txt")
+                DocumentSelector = DocumentSelector.ForPattern(@"**/*.bp")
             };
         }
     }

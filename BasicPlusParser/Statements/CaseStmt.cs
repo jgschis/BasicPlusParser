@@ -9,7 +9,7 @@ namespace BasicPlusParser.Statements
 
         public override HashSet<Token> GetReferencedVars()
         {
-            HashSet<Token> referencedVars = new(new TokenEqualityComparer());
+            HashSet<Token> referencedVars = new(tokenEqualityComparer);
             foreach (var @case in Cases)
             {
                 referencedVars.UnionWith(@case.Condition.GetReferencedVars());

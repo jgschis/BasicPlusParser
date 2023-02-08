@@ -5,6 +5,7 @@ using BasicPlusParser.Tokens;
 using BasicPlusParser.Statements;
 using BasicPlusParser.Statements.Expressions;
 using OiClient;
+using System.Text;
 
 namespace BasicPlusParser
 {
@@ -12,10 +13,12 @@ namespace BasicPlusParser
     {
         readonly string _text;
         readonly string _fileName;
+        readonly string _appName;
+        readonly bool _checkIfJumpLabelsAreDefined = true;
 
         int _nextTokenIndex = 0;
         List<Token> _tokens;
-        List<Token> _commentTokens;
+        List<Token> _trivialTokens;
         Token _nextToken => _nextTokenIndex < _tokens.Count ? _tokens[_nextTokenIndex] : _tokens.Last();
         Token _prevToken => _nextTokenIndex > 0 ? _tokens[_nextTokenIndex - 1] : null;
 
@@ -29,11 +32,20 @@ namespace BasicPlusParser
         Stack<string> _insertsProcessed = new();
 
 
-        public Parser(string text, string fileName, Client client)
+        public Parser(string text, string fileName,  Client client, string appName = "")
         {
             _text = text;
             _oiClient = client;
             _fileName = fileName;
+
+            if (appName == "") {
+                _appName = Client.GetAppNameFromFileName(fileName);
+                if (_appName == "") {
+                    throw new InvalidOperationException("The application name could not be determined. Either pass an application name or include it in the fileName per the convention.");
+                }
+            } else {
+                _appName = appName;
+            }
         }
 
         private Parser(string text,string fileName, Parser parser) {
@@ -43,6 +55,8 @@ namespace BasicPlusParser
             _text = text;
             _fileName = fileName;
             _insertsProcessed = parser._insertsProcessed;
+            _appName = parser._appName;
+            _checkIfJumpLabelsAreDefined = false;
         }
 
         public Procedure Parse()
@@ -56,7 +70,7 @@ namespace BasicPlusParser
             Tokenizer tokenizer = new(_text, _fileName);
             TokenizerOutput tokenizerOutput = tokenizer.Tokenise();
             _tokens = tokenizerOutput.Tokens;
-            _commentTokens = tokenizerOutput.CommentTokens;
+            _trivialTokens = tokenizerOutput.TrivalTokens;
             _parseErrors.Errors.AddRange(tokenizerOutput.TokenErrors.Errors);
 
             Procedure procedure = ParseProcedureDeclaration();
@@ -66,7 +80,7 @@ namespace BasicPlusParser
             procedure.SymbolTable = _symbolTable;
             procedure.Regions = _regions;
             procedure.Tokens = _tokens;
-            procedure.CommentTokens = _commentTokens;
+            procedure.TrivialTokens = _trivialTokens;
             return procedure;
         }
 
@@ -458,7 +472,8 @@ namespace BasicPlusParser
             {
                 return new EmptyStatement();
             }
-           
+
+
             throw Error(token, $"{token.Text} is not a valid statement.");
         }
 
@@ -492,6 +507,7 @@ namespace BasicPlusParser
             statement.LineNo = lineNo;
             statement.LineCol = lineCol;
             statement.EndCol = _prevToken.EndCol;
+            statement.FileName = _fileName;
             switch (statement)
             {
                 case
@@ -700,7 +716,7 @@ namespace BasicPlusParser
             ConsumeToken(typeof(CommaToken));
             Expression key = ParseExpr();
 
-            (List<Statement> thenBlock, List<Statement> elseBlock) = ParseThenElseBlock();
+            (List<Statement> thenBlock, List<Statement> elseBlock) = ParseThenElseBlock(optional:true);
             return new MatWriteStatement
             {
                 Else = elseBlock,
@@ -719,7 +735,7 @@ namespace BasicPlusParser
             ConsumeToken(typeof(CommaToken));
             Expression key = ParseExpr();
 
-            (List<Statement> thenBlock, List<Statement> elseBlock) = ParseThenElseBlock();
+            (List<Statement> thenBlock, List<Statement> elseBlock) = ParseThenElseBlock(optional: true); ;
             return new WriteStatement
             {
                 Else = elseBlock,
@@ -760,7 +776,7 @@ namespace BasicPlusParser
                 Handle = handle,
                 Key = key,
                 Then = thenBlock,
-                Var = new IdExpression(matrix, IdentifierType.Reference)
+                Var = new IdExpression(matrix, IdentifierType.Assignment)
             };
         }
 
@@ -821,7 +837,7 @@ namespace BasicPlusParser
                 functions.Add(new IdExpression(func, IdentifierType.Function));
                 if (pType == ProcedureType.Subroutine)
                 {
-                    _symbolTable.AddSubroutineDeclaation(func);
+                    _symbolTable.AddSubroutineDeclaration(func);
                 } else
                 {
                     _symbolTable.AddFunctionDeclaration(func);
@@ -1377,25 +1393,33 @@ namespace BasicPlusParser
                 try {
                     _insertsProcessed.Push(insert.Text.ToLower());
 
-                    string insertSourceCode = _oiClient.GetInsert(insert.Text);
+                    string insertSourceCode = _oiClient.GetInsert(insert.Text, _appName);
 
-                    Parser parser = new Parser(insertSourceCode, insert.Text, this);
-                    var insertAst = parser.Parse();
-                    insertStatements = insertAst.Statements;
+                    if (insertSourceCode == null) {
+                        _parseErrors.ReportError(insert, $"The insert {insert.Text} does not exist.");
+                        insertStatements = new();
+                    } else {
+                        Parser parser = new Parser(insertSourceCode, insert.Text, this);
+                        var insertAst = parser.Parse();
+                        insertStatements = insertAst.Statements;
+                    }
+
+                  
                 } finally {
                     _insertsProcessed.Pop();
                 }
 
             } else {
-                _parseErrors.ReportError(insert, "This insert creates a cycle.");
+                _parseErrors.ReportError(insert, $"The insert {insert.Text} is used cyclically.");
                 insertStatements = new();
             }
 
-
-            return new InsertStatement {
+            InsertStatement stmt = new InsertStatement {
                 Name = new IdExpression(insert, IdentifierType.Insert),
                 Statements = insertStatements
             };
+
+            return stmt;
         }
 
         Statement ParseMinusAssignmentStmt(Token token, Matrix matrix =null)
@@ -1551,7 +1575,7 @@ namespace BasicPlusParser
                     _parseErrors.ReportError(matVar, $"A system variable cannot be the name of a matrix.");
 
                 }
-                else if (_symbolTable.ContainsEquateOrVaraible(matVar))
+                else if (_symbolTable.IsMatrixDeclared(matVar))
                 {
                     _parseErrors.ReportError(matVar, $"The symbol {matVar.Text} has already been defined.");
 
@@ -1609,20 +1633,54 @@ namespace BasicPlusParser
                 nSlashes += 1;
             }
 
-            Token commonBlockId = ConsumeIdToken(addIdentifierToSymbolTable:false);
+            List<Token> tokensInCommonBlockName = new();
+            while (!(PeekNextToken() is SlashToken or EofToken or NewLineToken)) {
+                tokensInCommonBlockName.Add(GetNextToken());
+            }
+
+            if (nSlashes == 2) {
+                if (!NextTokenIs(typeof(SlashToken)) && !NextTokenIs(typeof(SlashToken))) {
+                    _parseErrors.ReportError(PeekNextToken(), "// expected");
+                }
+            } else {
+                if (!NextTokenIs(typeof(SlashToken))) {
+                    _parseErrors.ReportError(PeekNextToken(), "/ expected");
+                }
+            }
+
+            if (tokensInCommonBlockName.Count == 0) {
+                throw Error(PeekNextToken(), "A common black name is required.");
+            }
+
+            if (tokensInCommonBlockName.Count == 1 && tokensInCommonBlockName.First() is SystemVariableToken) {
+                _parseErrors.ReportError(tokensInCommonBlockName.First(), $"A system variable cannot be used as a common block id.");
+            }
+
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < tokensInCommonBlockName.Count; i++) {
+                if (i > 0) {
+                    var prevToken = tokensInCommonBlockName[i - 1];
+                    if (prevToken is IdentifierToken or NumberToken) {
+                        sb.Append(' ');
+                    } 
+                }
+                sb.Append(tokensInCommonBlockName [i].Text);
+            }
+
+            Token commonBlockId = new IdentifierToken {
+                Text = sb.ToString(),
+                StartCol = tokensInCommonBlockName.First().StartCol,
+                EndCol = tokensInCommonBlockName.Last().EndCol,
+                LineNo = tokensInCommonBlockName.First().LineNo,
+                EndLineNo = tokensInCommonBlockName.First().LineNo,
+                FileName = tokensInCommonBlockName.First().FileName,
+                Pos = tokensInCommonBlockName.First().Pos,
+            };
+
             if (_symbolTable.IsCommonBlockNameDefined(commonBlockId)){
                 _parseErrors.ReportError(commonBlockId, $"The symbol {commonBlockId.Text} has already been defined.");
             }
 
-            if (commonBlockId is SystemVariableToken)
-            {
-                _parseErrors.ReportError(commonBlockId, $"A system variable cannot be used as a common block id.");
-            }
-
-            for (int i = 1; i <= nSlashes;i++)
-            {
-                ConsumeToken(typeof(SlashToken));
-            }
 
             List<IdExpression> globalVars = new();
             do
@@ -2019,8 +2077,14 @@ namespace BasicPlusParser
 
             while (NextTokenIs(out Token optoken, typeof(AndToken), typeof(OrToken), typeof(MatchesToken)))
             {
+                       
+                if (inArray) {
+                    // An array index cannot contain any of the operators at this level. So if we see one of these operators, we are not in an array.
+                    _nextTokenIndex -= 1;
+                    return null;
+                }                
+                
                 Expression right = this.ParseLogExpr(inArray: inArray);
-
 
                 if (optoken is OrToken)
                 {
@@ -2041,12 +2105,14 @@ namespace BasicPlusParser
         Expression ParseLogExpr(bool inArray = false)
         {
             Expression expr = ParseConcatExpr();
+            int operatorsAtThisLevel = 0;
             while (NextTokenIs( out Token optoken, typeof(LAngleBracketToken), typeof(RAngleBracketToken), typeof(EqualToken), typeof(ExcalmEqToken),
                 typeof(HashTagToken), typeof(GeToken), typeof(LteToken),typeof(EqToken),typeof(NeToken),
                 typeof(LtToken),typeof(LeToken),typeof(GtToken),typeof(EqcToken),typeof(NecToken),
                 typeof(LtcToken),typeof(LecToken),typeof(GtcToken),typeof(GecToken),typeof(EqxToken),
                 typeof(NexToken),typeof(LtxToken),typeof(GtxToken),typeof(LexToken),typeof(GexToken), typeof(ExclamToken), typeof(DoubleEqualToken)))
             {
+
                 if (optoken is RAngleBracketToken && inArray)
                 {
                     // Since we are in an array, take the right angle bracket as the terminator of the array.
@@ -2054,8 +2120,15 @@ namespace BasicPlusParser
                     return expr;
                 }
 
+
+                operatorsAtThisLevel += 1;
+                if (operatorsAtThisLevel >=2) {
+                    _parseErrors.ReportError(optoken, $"The operator {optoken.Text} can't be used at this level.");
+                }
+
                 Expression right;
                 if  (optoken is LAngleBracketToken && NextTokenIs(typeof(RAngleBracketToken))){
+                    // Handle case of a <> b (a != b)
                     right = ParseConcatExpr();
                     expr = new NotEqExpression { Left = expr, Right = right, Operator = optoken.Text };
                     continue;
@@ -2063,6 +2136,7 @@ namespace BasicPlusParser
 
                 if (optoken is RAngleBracketToken && NextTokenIs(typeof(EqualToken)))
                 {
+                    // Handle case of a >= 3 
                     right = ParseConcatExpr();
                     expr = new GtEqExpression { Left = expr, Right = right, Operator = optoken.Text };
                     continue;
@@ -2624,7 +2698,11 @@ namespace BasicPlusParser
 
         void CheckIfJumpLabelsAreDefined()
         {
-            foreach(var label in _symbolTable.LabelReferences)
+            if (!_checkIfJumpLabelsAreDefined) {
+                return;
+            }
+
+            foreach (var label in _symbolTable.LabelReferences)
             {
                if (!_symbolTable.IsLabelDeclared(label))
                 {

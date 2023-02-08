@@ -43,7 +43,7 @@ namespace BasicPlusLangServer
         {
             return new FoldingRangeRegistrationOptions
             {
-                DocumentSelector = DocumentSelector.ForPattern(@"**/*.txt")
+                DocumentSelector = DocumentSelector.ForPattern(@"**/*.bp")
             };
         }
     }

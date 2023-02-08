@@ -37,19 +37,20 @@ namespace BasicPlusLangServer
 
     public class GetOiStoredProcsHandler : IGetCodeHandler
     {
-        OiClient.Client _client;
+        OiClientFactory _oiClientFactory;
 
-        public GetOiStoredProcsHandler (OiClient.Client client){
-            _client = client;
+        public GetOiStoredProcsHandler (OiClientFactory oiClientFactory){
+            _oiClientFactory = oiClientFactory;
         }
 
 
-        public  Task<Container<StoredProc>?> Handle(GetCodeHandleRequest request, CancellationToken cancellationToken)
+        public async Task<Container<StoredProc>?> Handle(GetCodeHandleRequest request, CancellationToken cancellationToken)
         {
-            var procs = _client.GetAllStoredProcs();
+            var client = await _oiClientFactory.GetClient();
+            var procs = client.GetAllStoredProcs();
 
             List<StoredProc> sp = procs.Select(p=>new StoredProc(p)).ToList();
-            return Task.FromResult<Container<StoredProc>?>(new Container<StoredProc>(sp.ToArray()));
+            return new Container<StoredProc>(sp.ToArray());
         }
     }
 }

@@ -24,14 +24,14 @@ namespace BasicPlusLangServer
                 return new LocationOrLocationLinks();
             }
 
-            Symbol symbol = doc.Proc.GetSymbol(request.Position.Line + 1, request.Position.Character);
+            Symbol symbol = doc.Proc.GetSymbol(request.Position.Line + 1, request.Position.Character, request.TextDocument.Uri.ToString());
             if (symbol == null)
             {
                 return new LocationOrLocationLinks();
             }
 
             return new LocationOrLocationLinks(new LocationOrLocationLink(new Location 
-                { Uri = request.TextDocument.Uri,
+                { Uri = symbol.Token.FileName,
                 Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(symbol.Token.LineNo-1,symbol.Token.StartCol,symbol.Token.LineNo-1,symbol.Token.EndCol)}));
         }
 
@@ -39,7 +39,7 @@ namespace BasicPlusLangServer
         {
             return new DefinitionRegistrationOptions()
             {
-                DocumentSelector = DocumentSelector.ForPattern(@"**/*.txt")
+                DocumentSelector = DocumentSelector.ForPattern(@"**/*.bp")
             };
         }
     }

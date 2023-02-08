@@ -15,8 +15,9 @@ namespace BasicPlusParser
         int _lineNo = 1;
 
         List<Token> _tokens = new();
-        List<Token> _commentTokens = new();
-        Token _prevToken => _tokens.Count > 0 ? _tokens.Last() : null;
+        List<Token> _trivialTokens = new();
+        Token _prevToken => _tokens.Any() ? _tokens.Last() : null;
+        Token _prevTrivialToken => _trivialTokens.Any() ? _trivialTokens.Last() : null;
         readonly ParseErrors _tokenErrors = new();
 
         public Tokenizer(string text, string fileName)
@@ -59,9 +60,13 @@ namespace BasicPlusParser
                     {
                         continue;
                     }
-                    else if (matchedToken is CommentToken)
+                    else if (matchedToken is NewLineToken && _prevTrivialToken is PipeToken) 
                     {
-                        _commentTokens.Add(matchedToken);
+                        _trivialTokens.Add(matchedToken);
+                    }
+                    else if (matchedToken is CommentToken || matchedToken is PipeToken)
+                    {
+                        _trivialTokens.Add(matchedToken);
                     }
                     else
                     {
@@ -70,12 +75,12 @@ namespace BasicPlusParser
                 }
             }
 
-            _tokens.Add(new EofToken { LineNo = _lineNo, Pos = _source.Length, StartCol = _col, EndCol = _col, EndLineNo = _lineNo });
+            _tokens.Add(new EofToken { LineNo = _lineNo, Pos = _source.Length, StartCol = _col, EndCol = _col, EndLineNo = _lineNo, FileName = _fileName });
 
             return new TokenizerOutput
             {
                 Tokens = _tokens,
-                CommentTokens = _commentTokens,
+                TrivalTokens = _trivialTokens,
                 TokenErrors = _tokenErrors
             };
         }
@@ -108,18 +113,16 @@ namespace BasicPlusParser
                 case '/':
                     if (StartOfStmt() && Match("/")) return ScanSingleLineComment();
                     else if (Match("//", ignoreWhitespace: true)) return new MultiValueDivToken { Text = _source[start.._pos] };
-                    //else if (Match("=")) return new SlashEqualToken { Text = _source[start.._pos] };
                     else if (Match("*")) return ScanMultiLineComment();
                     else return new SlashToken { Text = _source[start.._pos] };
                 case '*':
                     if (StartOfStmt()) return ScanSingleLineComment();
-                    //else if (Match("=")) return new StarEqualToken { Text = _source[start.._pos] };
                     else if (Match("**", ignoreWhitespace: true)) return new MultiValueMullToken { Text = _source[start.._pos] };
                     else if (Match("*", ignoreWhitespace: true)) return new PowerToken { Text = _source[start.._pos] };
                     else return new StarToken { Text = _source[start.._pos] };
                 case '!':
-                    if (Match("=", ignoreWhitespace: true)) return new ExcalmEqToken { Text = _source[start.._pos] };
-                    else if (StartOfStmt()) return ScanSingleLineComment();
+                    if (StartOfStmt()) return ScanSingleLineComment();
+                    else if (Match("=", ignoreWhitespace: true)) return new ExcalmEqToken { Text = _source[start.._pos] };
                     else return new ExclamToken { Text = _source[start.._pos] };
                 case ':':
                     if (Match("::", ignoreWhitespace: true)) return new MultiValueConcatToken { Text = _source[start.._pos] };
@@ -148,7 +151,7 @@ namespace BasicPlusParser
                 case '\\':
                     return ScanNumber();
                 case '.':
-                    return ScanNumber();
+                    return ScanNumber();      
                 case '@':
                     return ScanSystemVariableOrAtOperator();
                 case '\r':
@@ -165,6 +168,8 @@ namespace BasicPlusParser
                 case '\v':
                     while (Match(" ") || Match("\t") || Match("\f") || Match("\v"));
                     return new WhiteSpaceToken { Text = _source[start.._pos] };
+                case '|':
+                    return new PipeToken{ Text = _source[start.._pos] };
                 default:
                     if (IsIdentifierOrKeyWord(character))
                     {
@@ -176,16 +181,17 @@ namespace BasicPlusParser
                     }
                     else
                     {
-                        _tokenErrors.ReportError(_lineNo, $"Unmatched character.",_col,_col, _fileName);
-                        return null;
+                        //_tokenErrors.ReportError(_lineNo, $"Unmatched character: {character}",_col,_col, _fileName);
+                        return new CatchAllToken { Text = _source[start.._pos] };
                     }
             }
         }
 
-        bool IsIdentifierOrKeyWord(char chr)
-        {
+        bool IsIdentifierOrKeyWord(char chr) {
+
             return (chr >= 'a' && chr <= 'z') ||
-                    (chr >= 'A' && chr <= 'Z');
+                   (chr >= 'A' && chr <= 'Z') ||
+                   chr == '_';
         }
 
         bool IsNumber(char chr, bool hexAllowed = false)
@@ -225,6 +231,7 @@ namespace BasicPlusParser
             return new CommentToken { Text = _source[start.._pos] };
         }
         
+
         StringToken ScanStringLiteral(char delim)
         {
             int start = _pos - 1;
@@ -352,118 +359,137 @@ namespace BasicPlusParser
         Token ScanIdentifierOrKeyword()
         {
             int start = _pos - 1;
-            while (IsIdentifierOrKeyWord(Peek()) || IsNumber(Peek()) || Peek() == '_'  || Peek() == '@' || Peek() == '.' || Peek() == '$')
+            int startCol = _col;
+            while (IsIdentifierOrKeyWord(Peek()) || IsNumber(Peek()) || Peek() == '@' || Peek() == '.' || Peek() == '$' || Peek() == '%')
             {
                 Advance();
             }
 
             string idOrKeyword = _source[start.._pos];
 
-            return idOrKeyword.ToLower() switch
-            {
-                "loop" => new LoopToken { Text = idOrKeyword },
-                "repeat" => new RepeatToken { Text = idOrKeyword },
-                "if" => new IfToken { Text = idOrKeyword },
-                "then" => new ThenToken { Text = idOrKeyword },
-                "function" => new FunctionToken { Text = idOrKeyword },
-                "subroutine" => new SubroutineToken { Text = idOrKeyword },
-                "end" => new EndToken { Text = idOrKeyword },
-                "else" => new ElseToken { Text = idOrKeyword },
-                "begin" => new BeginToken { Text = idOrKeyword },
-                "case" => new CaseToken { Text = idOrKeyword },
-                "return" => new ReturnToken { Text = idOrKeyword },
-                "for" => new ForToken { Text = idOrKeyword },
-                "next" => new NextToken { Text = idOrKeyword },
-                "while" => new WhileToken { Text = idOrKeyword },
-                "until" => new UntilToken { Text = idOrKeyword },
-                "gosub" => new GosubToken { Text = idOrKeyword },
-                "to" => new ToToken { Text = idOrKeyword },
-                "equ" => new EquToken { Text = idOrKeyword },
-                "swap" => new SwapToken { Text = idOrKeyword },
-                "in" => new InToken { Text = idOrKeyword },
-                "with" => new WithToken { Text = idOrKeyword },
-                "convert" => new ConvertToken { Text = idOrKeyword },
-                "step" => new StepToken { Text = idOrKeyword },
-                "declare" => new DeclareToken { Text = idOrKeyword },
-                "call" => new CallToken { Text = idOrKeyword },
-                "remove" => new RemoveToken { Text = idOrKeyword },
-                "from" => new FromToken { Text = idOrKeyword },
-                "at" => new AtToken { Text = idOrKeyword },
-                "setting" => new SettingToken { Text = idOrKeyword },
-                "mat" => new MatToken { Text = idOrKeyword },
-                "locate" => new LocateToken { Text = idOrKeyword },
-                "using" => new UsingToken { Text = idOrKeyword },
-                "null" => new NullToken { Text = idOrKeyword },
-                "read" => new ReadToken { Text = idOrKeyword },
-                "write" => new WriteToken { Text = idOrKeyword },
-                "delete" => new DeleteToken { Text = idOrKeyword },
-                "lock" => new LockToken { Text = idOrKeyword },
-                "unlock" => new UnlockToken { Text = idOrKeyword },
-                "open" => new OpenToken { Text = idOrKeyword },
-                "debug" => new DebugToken { Text = idOrKeyword },
-                "cursor" => new CursorToken { Text = idOrKeyword },
-                "on" => new OnToken { Text = idOrKeyword },
-                "clearselect" => new ClearSelectToken { Text = idOrKeyword },
-                "readnext" => new ReadNextToken { Text = idOrKeyword },
-                "do" => new DoToken { Text = idOrKeyword },
-                "all" => new AllToken { Text = idOrKeyword },
-                "goto" => new GoToToken { Text = idOrKeyword },
-                "transfer" => new TransferToken { Text = idOrKeyword },
-                "matread" => new MatReadToken { Text = idOrKeyword },
-                "matwrite" => new MatWriteToken { Text = idOrKeyword },
-                "oswrite" => new OsWriteToken { Text = idOrKeyword },
-                "osread" => new OsReadToken { Text = idOrKeyword },
-                "dimension" => new DimensionToken { Text = idOrKeyword },
-                "dim" => new DimensionToken { Text = idOrKeyword },
-                "output" => new OutputToken { Text = idOrKeyword },
-                "precomp" => new PreCompToken { Text = idOrKeyword },
-                "common" => new CommonToken { Text = idOrKeyword },
-                "freecommon" => new FreeCommonToken { Text = idOrKeyword },
-                "initrnd" => new InitRndToken { Text = idOrKeyword },
-                "by" => new ByToken { Text = idOrKeyword },
-                "select" => new SelectToken { Text = idOrKeyword },
-                "equate" => new EquToken { Text = idOrKeyword },
-                "garbagecollect" => new GarbageCollectToken { Text = idOrKeyword },
-                "flush" => new FlushToken { Text = idOrKeyword },
-                "readv" => new ReadVToken { Text = idOrKeyword },
-                "reado" => new ReadOToken { Text = idOrKeyword },
-                "matparse" => new MatParseToken { Text = idOrKeyword },
-                "into" => new IntoToken { Text = idOrKeyword },
-                "matches" => new MatchesToken { Text = idOrKeyword },
-                "initdir" => new InitDirToken { Text = idOrKeyword },
-                "writev" => new WriteVToken { Text = idOrKeyword },
-                "compile" => new CompileToken { Text = idOrKeyword },
-                "osopen" => new OsOpenToken { Text = idOrKeyword },
-                "osdelete" => new OsDeleteToken { Text = idOrKeyword },
-                "osclose" => new OsCloseToken { Text = idOrKeyword },
-                "osbread" => new OsBReadToken { Text = idOrKeyword },
-                "osbwrite" => new OsBWriteToken { Text = idOrKeyword },
-                "length" => new LengthToken { Text = idOrKeyword },
-                "bremove" => new BRemoveToken { Text = idOrKeyword },
-                "insert" => new InsertDeclarationToken { Text = idOrKeyword },
-                "abort" => new AbortToken { Text = idOrKeyword },
-                "ge" => new GeToken { Text = idOrKeyword },
-                "ne" => new NeToken { Text = idOrKeyword },
-                "lt" => new LtToken { Text = idOrKeyword },
-                "le" => new LeToken { Text = idOrKeyword },
-                "gt" => new GtToken { Text = idOrKeyword },
-                "eq" => new EqToken { Text = idOrKeyword },
-                "_eqc" => new EqcToken { Text = idOrKeyword },
-                "_nec" => new NecToken { Text = idOrKeyword },
-                "_ltc" => new LtcToken { Text = idOrKeyword },
-                "_lec" => new LecToken { Text = idOrKeyword },
-                "_gtc" => new GtcToken { Text = idOrKeyword },
-                "_gec" => new GecToken { Text = idOrKeyword },
-                "_eqx" => new EqxToken { Text = idOrKeyword },
-                "_nex" => new NextToken { Text = idOrKeyword },
-                "_ltx" => new LtxToken { Text = idOrKeyword },
-                "_gtx" => new GtxToken { Text = idOrKeyword },
-                "_lex" => new LexToken { Text = idOrKeyword },
-                "_gex" => new GexToken { Text = idOrKeyword },
-                "and" => new AndToken { Text = idOrKeyword },
-                "or" => new OrToken { Text = idOrKeyword },
-                _ => new IdentifierToken { Text = idOrKeyword }      
-            };
+            if (idOrKeyword[0] == '_') {
+                switch (idOrKeyword.ToLower()) {
+                    case "_eqc":
+                        return new EqcToken { Text = idOrKeyword };
+                    case "_nec":
+                        return new NecToken { Text = idOrKeyword };
+                    case "_ltc":
+                        return new LtcToken { Text = idOrKeyword };
+                    case "_lec":
+                        return new LecToken { Text = idOrKeyword };
+                    case "_gtc":
+                        return new GtcToken { Text = idOrKeyword };
+                    case "_eqx":
+                        return new EqxToken { Text = idOrKeyword };
+                    case "_nex":
+                        return new NexToken { Text = idOrKeyword };
+                    case "_ltx":
+                        return new LtxToken { Text = idOrKeyword };
+                    case "_gtx":
+                        return new GtxToken { Text = idOrKeyword };
+                    case "_lex":
+                        return new LexToken { Text = idOrKeyword };
+                    case "_gex":
+                        return new GexToken { Text = idOrKeyword };
+                    default:
+                        _tokenErrors.ReportError(_lineNo, $"A variable name cannot start with _.", startCol, _col, _fileName);
+                        return new IdentifierToken { Text = idOrKeyword };
+
+                }
+            } else {
+                return idOrKeyword.ToLower() switch {
+                    "loop" => new LoopToken { Text = idOrKeyword },
+                    "repeat" => new RepeatToken { Text = idOrKeyword },
+                    "if" => new IfToken { Text = idOrKeyword },
+                    "then" => new ThenToken { Text = idOrKeyword },
+                    "function" => new FunctionToken { Text = idOrKeyword },
+                    "subroutine" => new SubroutineToken { Text = idOrKeyword },
+                    "end" => new EndToken { Text = idOrKeyword },
+                    "else" => new ElseToken { Text = idOrKeyword },
+                    "begin" => new BeginToken { Text = idOrKeyword },
+                    "case" => new CaseToken { Text = idOrKeyword },
+                    "return" => new ReturnToken { Text = idOrKeyword },
+                    "for" => new ForToken { Text = idOrKeyword },
+                    "next" => new NextToken { Text = idOrKeyword },
+                    "while" => new WhileToken { Text = idOrKeyword },
+                    "until" => new UntilToken { Text = idOrKeyword },
+                    "gosub" => new GosubToken { Text = idOrKeyword },
+                    "to" => new ToToken { Text = idOrKeyword },
+                    "equ" => new EquToken { Text = idOrKeyword },
+                    "swap" => new SwapToken { Text = idOrKeyword },
+                    "in" => new InToken { Text = idOrKeyword },
+                    "with" => new WithToken { Text = idOrKeyword },
+                    "convert" => new ConvertToken { Text = idOrKeyword },
+                    "step" => new StepToken { Text = idOrKeyword },
+                    "declare" => new DeclareToken { Text = idOrKeyword },
+                    "call" => new CallToken { Text = idOrKeyword },
+                    "remove" => new RemoveToken { Text = idOrKeyword },
+                    "from" => new FromToken { Text = idOrKeyword },
+                    "at" => new AtToken { Text = idOrKeyword },
+                    "setting" => new SettingToken { Text = idOrKeyword },
+                    "mat" => new MatToken { Text = idOrKeyword },
+                    "locate" => new LocateToken { Text = idOrKeyword },
+                    "using" => new UsingToken { Text = idOrKeyword },
+                    "null" => new NullToken { Text = idOrKeyword },
+                    "read" => new ReadToken { Text = idOrKeyword },
+                    "write" => new WriteToken { Text = idOrKeyword },
+                    "delete" => new DeleteToken { Text = idOrKeyword },
+                    "lock" => new LockToken { Text = idOrKeyword },
+                    "unlock" => new UnlockToken { Text = idOrKeyword },
+                    "open" => new OpenToken { Text = idOrKeyword },
+                    "debug" => new DebugToken { Text = idOrKeyword },
+                    "cursor" => new CursorToken { Text = idOrKeyword },
+                    "on" => new OnToken { Text = idOrKeyword },
+                    "clearselect" => new ClearSelectToken { Text = idOrKeyword },
+                    "readnext" => new ReadNextToken { Text = idOrKeyword },
+                    "do" => new DoToken { Text = idOrKeyword },
+                    "all" => new AllToken { Text = idOrKeyword },
+                    "goto" => new GoToToken { Text = idOrKeyword },
+                    "transfer" => new TransferToken { Text = idOrKeyword },
+                    "matread" => new MatReadToken { Text = idOrKeyword },
+                    "matwrite" => new MatWriteToken { Text = idOrKeyword },
+                    "oswrite" => new OsWriteToken { Text = idOrKeyword },
+                    "osread" => new OsReadToken { Text = idOrKeyword },
+                    "dimension" => new DimensionToken { Text = idOrKeyword },
+                    "dim" => new DimensionToken { Text = idOrKeyword },
+                    "output" => new OutputToken { Text = idOrKeyword },
+                    "precomp" => new PreCompToken { Text = idOrKeyword },
+                    "common" => new CommonToken { Text = idOrKeyword },
+                    "freecommon" => new FreeCommonToken { Text = idOrKeyword },
+                    "initrnd" => new InitRndToken { Text = idOrKeyword },
+                    "by" => new ByToken { Text = idOrKeyword },
+                    "select" => new SelectToken { Text = idOrKeyword },
+                    "equate" => new EquToken { Text = idOrKeyword },
+                    "garbagecollect" => new GarbageCollectToken { Text = idOrKeyword },
+                    "flush" => new FlushToken { Text = idOrKeyword },
+                    "readv" => new ReadVToken { Text = idOrKeyword },
+                    "reado" => new ReadOToken { Text = idOrKeyword },
+                    "matparse" => new MatParseToken { Text = idOrKeyword },
+                    "into" => new IntoToken { Text = idOrKeyword },
+                    "matches" => new MatchesToken { Text = idOrKeyword },
+                    "initdir" => new InitDirToken { Text = idOrKeyword },
+                    "writev" => new WriteVToken { Text = idOrKeyword },
+                    "compile" => new CompileToken { Text = idOrKeyword },
+                    "osopen" => new OsOpenToken { Text = idOrKeyword },
+                    "osdelete" => new OsDeleteToken { Text = idOrKeyword },
+                    "osclose" => new OsCloseToken { Text = idOrKeyword },
+                    "osbread" => new OsBReadToken { Text = idOrKeyword },
+                    "osbwrite" => new OsBWriteToken { Text = idOrKeyword },
+                    "length" => new LengthToken { Text = idOrKeyword },
+                    "bremove" => new BRemoveToken { Text = idOrKeyword },
+                    "insert" => new InsertDeclarationToken { Text = idOrKeyword },
+                    "abort" => new AbortToken { Text = idOrKeyword },
+                    "ge" => new GeToken { Text = idOrKeyword },
+                    "ne" => new NeToken { Text = idOrKeyword },
+                    "lt" => new LtToken { Text = idOrKeyword },
+                    "le" => new LeToken { Text = idOrKeyword },
+                    "gt" => new GtToken { Text = idOrKeyword },
+                    "eq" => new EqToken { Text = idOrKeyword },
+                    "and" => new AndToken { Text = idOrKeyword },
+                    "or" => new OrToken { Text = idOrKeyword },
+                    _ => new IdentifierToken { Text = idOrKeyword }
+                };
+            }
         }
 
         NumberToken ScanNumber()
@@ -518,15 +544,6 @@ namespace BasicPlusParser
             return _pos >= _source.Length;
         }
 
-        /*bool Match(char expected)
-        {
-            if (IsAtEnd()) return false;
-            if (_source[_pos] != expected) return false;
-
-            IncrementPos();
-            return true;
-        }*/
-
         char Advance()
         {
             char c = _source[_pos];
@@ -538,7 +555,6 @@ namespace BasicPlusParser
         {
             if (IsAtEnd()) return false;
 
-           // if (ignoreWhitespace) {
             int startPos = _pos;
             int startCol = _col;
 
@@ -553,16 +569,8 @@ namespace BasicPlusParser
                     IncrementPos();
                 }
             }
-               // }
-                // If we got here, then we found the expected string.
-                return true;
-            /*
-            if (_source.Substring(_pos).StartsWith(expected, StringComparison.OrdinalIgnoreCase))
-            {
-                IncrementPos(expected.Length);
-                return true;
-            }
-            return false;*/
+            // If we got here, then we found the expected string.
+            return true;
         }
 
         char Peek()

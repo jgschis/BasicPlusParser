@@ -23,7 +23,7 @@ namespace BasicPlusLangServer
             var doc = _documentManager.GetDocument(request.TextDocument.Uri.ToString());
             if (doc != null)
             {
-                Symbol symbol = doc.Proc.GetSymbol(request.Position.Line + 1, request.Position.Character);
+                Symbol symbol = doc.Proc.GetSymbol(request.Position.Line + 1, request.Position.Character, request.TextDocument.Uri.ToString());
                 if (symbol == null)
                 {
                     return Task.FromResult<Hover?>(null);
@@ -91,7 +91,7 @@ namespace BasicPlusLangServer
         {
             return new HoverRegistrationOptions()
             {
-                DocumentSelector = DocumentSelector.ForPattern(@"**/*.txt")
+                DocumentSelector = DocumentSelector.ForPattern(@"**/*.bp")
             };
         }
     }

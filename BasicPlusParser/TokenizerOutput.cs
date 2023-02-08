@@ -5,11 +5,10 @@ namespace BasicPlusParser
 {
     public class TokenizerOutput
     {
-        // This contains all tokens except comment tokens. The parser uses this list.
-        // Includnig comments in the list of tokens makes the parsing more complicated.
+        // This contains all tokens except trivial tokens.
         public List<Token> Tokens;
-        // This contains all the comment tokens. This is used for syntax highlighting.
-        public List<Token> CommentTokens;
+        // This contains all tokens that are not important in terms of what the progrma does. For example, comment tokens.
+        public List<Token> TrivalTokens;
 
         public ParseErrors TokenErrors = new();
     }

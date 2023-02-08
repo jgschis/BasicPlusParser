@@ -52,7 +52,7 @@ namespace BasicPlusLangServer
 
             return new CompletionRegistrationOptions()
             {
-                DocumentSelector = DocumentSelector.ForPattern(@"**/*.txt"),
+                DocumentSelector = DocumentSelector.ForPattern(@"**/*.bp"),
                 ResolveProvider = true,
                 TriggerCharacters = new[] { "\r","\n" },
                 AllCommitCharacters = new[] { "\r","\n"}

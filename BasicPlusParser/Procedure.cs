@@ -13,7 +13,7 @@ namespace BasicPlusParser
         public Symbols SymbolTable = new();
         public List<Region> Regions = new();
         public List<Token> Tokens = new();
-        public List<Token> CommentTokens = new();
+        public List<Token> TrivialTokens = new();
 
         // If the file is empty, return a "blank" program.
         public Procedure() { }
@@ -24,7 +24,7 @@ namespace BasicPlusParser
             Name = name;
         }
 
-        public Symbol GetSymbol(int lineNo, int col)
+        public Symbol GetSymbol(int lineNo, int col, string fileName)
         {
             SymbolReference symbolRef;
             int min = 0;
@@ -35,7 +35,7 @@ namespace BasicPlusParser
                 index = ((max - min) / 2) + min;
 
                 Token token = Tokens[index];
-                if (token.LineNo == lineNo && token.StartCol <= col && token.EndCol >= col && SymbolTable.SymbolIndex.TryGetValue($"{token.LineNo}.{token.StartCol}", out symbolRef))
+                if (token.LineNo == lineNo && token.StartCol <= col && token.EndCol >= col && SymbolTable.SymbolIndex.TryGetValue($"{token.LineNo}.{token.StartCol}.{fileName}", out symbolRef))
                 {
                     // Return exact match
                     return symbolRef.Symbol;
@@ -50,7 +50,7 @@ namespace BasicPlusParser
                 }
             }
             // Return closest match
-            SymbolTable.SymbolIndex.TryGetValue($"{Tokens[index].LineNo}.{Tokens[index].StartCol}", out symbolRef);
+            SymbolTable.SymbolIndex.TryGetValue($"{Tokens[index].LineNo}.{Tokens[index].StartCol}.{fileName}", out symbolRef);
             return symbolRef?.Symbol;
         }
 
@@ -82,31 +82,31 @@ namespace BasicPlusParser
             return Tokens[index];
         }
 
-        // Merges comment and non-comment tokens into single list.
+        // Merges the important tokens with the trivial tokens.
         public IEnumerable<Token> GetTokens(bool includeComments = false)
         {
             int i = 0;
             int j = 0;
             while (true)
             {
-                if (i < Tokens.Count && j < CommentTokens.Count)
+                if (i < Tokens.Count && j < TrivialTokens.Count)
                 {
-                    if (Tokens[i].Pos < CommentTokens[j].Pos)
+                    if (Tokens[i].Pos < TrivialTokens[j].Pos)
                     {
                         yield return Tokens[i++];
                     }
                     else
                     {
-                        yield return CommentTokens[j++];
+                        yield return TrivialTokens[j++];
                     }
                 }
                 else if (i < Tokens.Count)
                 {
                     yield return Tokens[i++];
                 }
-                else if (j < CommentTokens.Count)
+                else if (j < TrivialTokens.Count)
                 {
-                    yield return CommentTokens[j++];
+                    yield return TrivialTokens[j++];
                 }
                 else
                 {

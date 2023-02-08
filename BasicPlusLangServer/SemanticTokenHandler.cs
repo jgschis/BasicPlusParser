@@ -21,7 +21,7 @@ namespace BasicPlusLangServer
         {
             return new SemanticTokensRegistrationOptions
             {
-                DocumentSelector = DocumentSelector.ForPattern(@"**/*.txt"),
+                DocumentSelector = DocumentSelector.ForPattern(@"**/*.bp"),
                 Legend = new SemanticTokensLegend
                 {
                     TokenModifiers = capability.TokenModifiers,
